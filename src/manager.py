@@ -82,7 +82,7 @@ class Manager:
                 duration=duration,
                 period=period,
                 dates=dates,
-                must_be_filled=(not must_be_filled == ""),
+                must_be_filled=must_be_filled == 1,
                 n_employees=n_employees,
             )
         )
@@ -304,8 +304,8 @@ class Manager:
                     # If there are no eligible employees, start again
                     if (cost_matrix >= LARGE_NUMBER).all():
                         if shift["must_be_filled"]:
-                            c += 1
                             print(f"Trying generating another initial solution {c} {i}")
+                            c += 1
                             break
                         else:
                             solutions.loc[i, j] = -1
@@ -384,6 +384,9 @@ class Manager:
             ]
             cost[solution[morning_shifts.index]] = LARGE_NUMBER
 
+        # # If working a morning shift, can not work in the afternoon
+        # if shift["period"] == AFTERNOON:
+
         # # Only two evening shifts are allowed per week
         # if shift["period"] == EVENING:
         #     week_start = shift["date"] - pd.offsets.Day(shift["date"].weekday())
@@ -416,19 +419,42 @@ class Manager:
             ]
             n_necessary_employees = tomorrow_shifts.groupby("area").size()
             available_employees = self.employees[n_necessary_employees.index].sum()
+            unavailable_employees = []
 
             # Account for employees that are working on evening shifts today
             today_shifts = previous_shifts[previous_shifts["date"] == shift["date"]]
-            employees_today = self.employees.iloc[solution[today_shifts.index]]
             available_employees = (
-                available_employees - employees_today[n_necessary_employees.index].sum()
-            )
+                available_employees
+                - self.employees.iloc[solution[today_shifts.index]]
+                .select_dtypes(bool)
+                .sum()
+            ).dropna()
+            unavailable_employees.extend(solution[today_shifts.index])
 
-            areas = n_necessary_employees.index[
-                available_employees == n_necessary_employees
-            ]
-            for area in areas:
-                cost[self.employees[area]] = LARGE_NUMBER
+            previous_sum = -1
+            updated_available_employees = available_employees
+            while updated_available_employees.sum() != previous_sum:
+                previous_sum = updated_available_employees.sum()
+
+                # Account for employees that will be assigned to another area for sure
+                for area in n_necessary_employees[
+                    n_necessary_employees == updated_available_employees
+                ].index:
+                    employees = self.employees[self.employees[area]].index
+                    unavailable_employees = np.concatenate(
+                        (unavailable_employees, employees)
+                    )
+
+                unavailable_employees = np.unique(unavailable_employees)
+                updated_available_employees = (
+                    available_employees
+                    - self.employees.iloc[unavailable_employees]
+                    .select_dtypes(bool)
+                    .sum()
+                )
+                updated_available_employees = updated_available_employees.dropna()
+
+            cost[unavailable_employees] = LARGE_NUMBER
 
         # Employees should have (hopefully) at least one weekend free
         # Therefore, the cost of choosing someone for a weekend shift who
@@ -512,15 +538,9 @@ class Manager:
 if __name__ == "__main__":
     GA_params = dict(n_solutions=1, n_iterations=100, mutation_rate=0.001)
     manager = Manager(2023, 7, GA_params)
-    # manager.add_area("Plantao_Noturno", 12, "E", 2, DAYS_OF_WEEK)
-    # manager.add_area("Plantao_Diurno", 12, "M", 2, ["SAT", "SUN"])
-    # manager.add_area("Puerperio_Manha1", 5, "M", 4, ["MON", "WED"])
 
-    # manager.add_area("Puerperio_Manha2", 5, "M", 3, ["TUE", "THU", "FRI"])
-    # manager.add_area("Puerperio_Ambulatorio", 5 + 3, "M", 1, ["TUE", "THU", "FRI"])
-
-    inputs_areas = pd.read_csv(
-        r"C:\Users\brene\Dropbox\shift_manager\areas.csv", keep_default_na=False
+    inputs_areas = pd.read_excel(
+        r"C:\Users\brene\Dropbox\shift_manager\areas.xlsx", keep_default_na=False
     )
     for _, row in inputs_areas.iterrows():
         # _, row = next(areas.iterrows())
@@ -528,8 +548,8 @@ if __name__ == "__main__":
         manager.add_shift_params(*row)
     manager.shifts_params
 
-    employees = pd.read_csv(
-        r"C:\Users\brene\Dropbox\shift_manager\employees.csv",
+    employees = pd.read_excel(
+        r"C:\Users\brene\Dropbox\shift_manager\employees.xlsx",
     )
     employees = employees.fillna(False)
     for col in employees.columns[1:]:
@@ -537,7 +557,9 @@ if __name__ == "__main__":
     for _, row in employees.iterrows():
         name = row[0]
         manager.add_employee(name, employees.columns[1:][row[1:]].values)
-    manager.employees
+    inputs_areas
+
+    # %%
 
     manager.create_schedule()
 
@@ -551,8 +573,8 @@ if __name__ == "__main__":
     shifts[shifts["employee"] == "Vitoria"]
 
     shifts["day"] = shifts["date"].dt.day
-    shifts.to_csv("escala.csv")
-    shifts[shifts["employee"] == "Maria Guerra"].to_csv("escala_Maria.csv")
+    shifts.to_csv("escala.xlsx")
+    shifts[shifts["employee"] == "Maria Guerra"].to_csv("escala_Maria.xlsx")
 
     shifts[shifts["employee"] == "Isabelle Amorim"]
 
@@ -574,6 +596,8 @@ if __name__ == "__main__":
     shifts["sort_key"] = shifts["period"].map({"M": 0, "E": 1, "A": 2})
     areas = shifts.sort_values("sort_key")["area"].unique()
     areas
+
+    max_employees = inputs_areas["N_Residentes"].max()
 
     data_all = []
     shifts.week.unique()
@@ -599,7 +623,7 @@ if __name__ == "__main__":
                         texts = []
                         for employee, flag in zip(employees, until_afternoon):
                             if flag:
-                                text = employee + "(TARDE)"
+                                text = employee + "(MANHÃ E TARDE)"
                             else:
                                 text = employee
                             texts.append(text)
@@ -624,7 +648,7 @@ if __name__ == "__main__":
     )
     df = df.set_index(["SEMANA", "PERIODO", "AREA"])
 
-    # People that is working in only one area
+    # People that are working in only one area
     one_area_person = manager.employees[
         manager.employees.select_dtypes(bool).sum(axis=1) == 1
     ]
@@ -635,9 +659,38 @@ if __name__ == "__main__":
     # Areas that have only one person and must be filled
     one_person_area = manager.employees.select_dtypes(bool).sum()
     one_person_area = one_person_area[one_person_area == 1].index
-    must_not_be_filled = inputs_areas[inputs_areas["Obrigatorio"] == ""]["Area"]
+    must_not_be_filled = inputs_areas[inputs_areas["Obrigatorio"] != 1]["Area"]
     one_person_area = one_person_area[~one_person_area.isin(must_not_be_filled)]
     df = df.drop(level="AREA", index=one_person_area)
 
     df.head(30)
-    df.to_excel("test.xlsx")
+
+    with pd.ExcelWriter(r"../test.xlsx") as writer:
+        df.to_excel(writer, sheet_name="Escala", index=True)
+        sheet = writer.sheets["Escala"]
+        for column in df:
+            column_length = 30
+            col_idx = df.columns.get_loc(column) + 3
+            writer.sheets["Escala"].set_column(col_idx, col_idx, column_length)
+
+        sheet.freeze_panes(0, 1)
+        sheet.freeze_panes(0, 2)
+        sheet.freeze_panes(0, 3)
+        sheet.freeze_panes(1, 0)
+
+        for i, (indexes, row) in enumerate(df.iterrows()):
+            week, period, area = indexes
+            if week % 2 == 0:
+                sheet.set_row(
+                    i + 1, 20, writer.book.add_format({"bg_color": "#e8e8cf"})
+                )
+            else:
+                sheet.set_row(
+                    i + 1, 20, writer.book.add_format({"bg_color": "#cfdbe8"})
+                )
+
+    # %%
+    manager.shifts[manager.shifts["employee"] == "Marcela"].style.apply(
+        color_per_day, axis=1
+    ).set_properties(color="black")
+    # df[df['employee_id']=='Ana Luiza'].to_excel('../escala.xslx')
