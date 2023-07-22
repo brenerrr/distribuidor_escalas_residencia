@@ -1,19 +1,11 @@
 # %%
 
 from collections import defaultdict
-from typing import Union
-
 from matplotlib import pyplot as plt
-from common_types import *
-import pprint
-import datetime
-import calendar
-from employee import Employee
+from src.common_types import *
 import pandas as pd
-from pandas.core.indexes.datetimes import DatetimeIndex
 import numpy as np
 from random import choices, seed
-import time
 from matplotlib.colors import rgb2hex
 
 np.random.seed(1)
@@ -155,13 +147,52 @@ class Manager:
         shifts["employee_id"] = ""
         self.__shifts = shifts
 
+    def find_conflicts(self, shift, shifts):
+        conflicts = []
+
+        # Can not work on two shifts at the same time
+        conflicts.extend(shifts[(shift["date"] == shifts["date"])].index)
+
+        # If evening shift, check if employee i is working
+        # - yesterday on an evening shift
+        # - tomorrow on an afternoon/evening shift
+        # - tomorrow on a long morning shift if it is a weekend
+        if shift["period"] == EVENING:
+            conflicts.extend(
+                shifts[
+                    (shift["date"] - pd.DateOffset(days=1) == (shifts["date"]))
+                    | (shift["date"] + pd.DateOffset(days=1) == (shifts["date"]))
+                    | (
+                        (shift["date"].day + 1 == shifts["date"].dt.day)
+                        & (shifts["period"] == AFTERNOON)
+                    )
+                    | (
+                        (shift["date"].day + 1 == shifts["date"].dt.day)
+                        & (shifts["period"] == MORNING)
+                        & (shifts["duration"] > 5)
+                        # & (shifts["is_weekend"])
+                    )
+                ].index
+            )
+
+        # If long morning shift on weekend check if employee i is working
+        # - yesterday on an evening shift
+        # - today's evening shift
+        if shift["period"] == MORNING and shift["duration"] >= 12:
+            conflicts.extend(
+                shifts[
+                    (
+                        (shift["date"].day - 1 == shifts["date"].dt.day)
+                        & (shifts["period"] == EVENING)
+                    )
+                    | (shift["date"].day == shifts["date"].dt.day)
+                ].index
+            )
+
+        return conflicts
+
     def create_schedule(self) -> None:
-        # Create dates
-
-        # Create shifts
-        # self.create_shifts(all_dates)
-
-        best = self.perform_GA()
+        best = self.find_solution()
 
         # Assign people from solution to shifts
         solution = best["solution"][best["solution"] >= 0]
@@ -186,9 +217,197 @@ class Manager:
         )
         employees = pd.merge(employees, hours_worked, left_index=True, right_index=True)
         self.__employees = employees
-        pass
 
-    def perform_GA(self):
+        self.create_free_weekends()
+
+    def create_free_weekends(self) -> None:
+        # Create free weekends
+        seed(1)
+        shifts = self.shifts.copy()
+        employees = self.employees
+        employees["free_weekend"] = ""
+        weekends_shifts = shifts[shifts["is_weekend"]]
+        weeks = shifts[shifts["is_weekend"]]["week"].unique()
+        # Loop through employees
+
+        for i in employees.index:
+            weekends_shifts = shifts[
+                (shifts["is_weekend"]) & (shifts["employee_id"] == i)
+            ]
+            if weekends_shifts.empty:
+                continue
+
+            sucessful_swaps = False
+            counter = 0
+            while not sucessful_swaps:
+                counter += 1
+                if counter > 15:
+                    print(
+                        f"Could not find a free weekend for {employees.iloc[int(i)]['name']}"
+                    )
+                    week = -1
+                    break
+                week = choices(weeks)[0]
+                free_weekend_shifts = shifts[
+                    (shifts["is_weekend"])
+                    & (shifts["employee_id"] == i)
+                    & (shifts["week"] == week)
+                ]
+
+                # Loop through shifts this weekend and replace them
+                for index in free_weekend_shifts.index:
+                    # Choose people that are already working the most this weekend
+                    shifts_this_weekend = shifts[
+                        (shifts["is_weekend"])
+                        & (shifts["employee_id"] != i)
+                        & (shifts["week"] == week)
+                    ]
+                    # If empty then try another weekend
+                    if shifts_this_weekend.empty:
+                        continue
+
+                    shift = free_weekend_shifts.loc[index]
+
+                    candidates = shifts[(shifts["area"] == shift["area"])][
+                        "employee_id"
+                    ].unique()
+                    candidates = candidates[
+                        employees.loc[candidates]["free_weekend"] != week
+                    ]
+
+                    # If evening shift, dont consider people that are working on
+                    # tomorrow's or yesterday's evening shift
+                    exclude = []
+                    if shift["period"] == EVENING:
+                        exclude.extend(
+                            shifts_this_weekend[
+                                (
+                                    (
+                                        shifts_this_weekend["date"]
+                                        == (shift["date"] + pd.DateOffset(days=1))
+                                    )
+                                    | (
+                                        shifts_this_weekend["date"].dt.day
+                                        == (shift["date"] - pd.DateOffset(days=1))
+                                    )
+                                )
+                            ]["employee_id"].astype(int)
+                        )
+
+                    # If evening shift, don't consider people that worked on long morning
+                    # shifts today or tomorrow
+                    if shift["period"] == EVENING:
+                        exclude.extend(
+                            shifts_this_weekend[
+                                (
+                                    (
+                                        shifts_this_weekend["date"].dt.day
+                                        == shift["date"].day
+                                    )
+                                    | (
+                                        shifts_this_weekend["date"].dt.day
+                                        == (shift["date"].day + 1)
+                                    )
+                                )
+                                & (shifts_this_weekend["period"] == MORNING)
+                                & (shifts_this_weekend["duration"] >= 12)
+                            ]["employee_id"].astype(int)
+                        )
+
+                    # If long morning shift, dont consider people that are working
+                    # on today's and yesterday's evening shift
+                    if shift["period"] == MORNING and shift["duration"] >= 12:
+                        exclude.extend(
+                            shifts_this_weekend[
+                                (
+                                    shifts_this_weekend["date"].dt.day
+                                    == (shift["date"].day - 1)
+                                )
+                                & (
+                                    shifts_this_weekend["date"].dt.day
+                                    == (shift["date"].day)
+                                )
+                                & (shifts_this_weekend["period"] == EVENING)
+                            ]["employee_id"].astype(int)
+                        )
+
+                    exclude.extend(
+                        shifts_this_weekend[
+                            shifts_this_weekend["date"] == shift["date"]
+                        ]["employee_id"].astype(int)
+                    )
+                    candidates = [c for c in candidates if c not in exclude]
+
+                    # Try to switch shifts with candidates
+                    swap = []
+                    for j in candidates:
+                        # List all shifts of the same kind of this candidate that are on other weekends
+                        shifts_swap = shifts[
+                            (shifts["employee_id"] == j)
+                            & (shifts["area"] == shift["area"])
+                            & (shifts["duration"] == shift["duration"])
+                            & ~(
+                                shifts["is_weekend"] & (shifts["week"] == shift["week"])
+                            )
+                            & ~(
+                                shifts["is_weekend"]
+                                & (shifts["week"] == employees.loc[j, "free_weekend"])
+                            )
+                            & (shifts["date"] != shift["date"])
+                        ]
+
+                        shifts_i = shifts[(shifts["employee_id"] == i)]
+                        shifts_j = shifts[(shifts["employee_id"] == j)]
+
+                        for _, shift_ in shifts_swap.iterrows():
+                            conflicts = self.find_conflicts(shift_, shifts_i)
+                            conflicts.extend(self.find_conflicts(shift, shifts_j))
+                            if conflicts:
+                                continue
+                            else:
+                                swap.append(shift_)
+
+                    if swap:
+                        shift_to_swap = choices(swap)[0]
+                        index_swap = shifts[
+                            shifts["name"] == shift_to_swap["name"]
+                        ].index[0]
+                        print("Swapping:")
+                        print(
+                            f'{shifts.loc[index, ["name", "employee"]]} with \n{shifts.loc[index_swap, ["name", "employee"]]}\n\n'
+                        )
+                        (
+                            shifts.loc[index, ["employee_id", "employee"]],
+                            shifts.loc[index_swap, ["employee_id", "employee"]],
+                        ) = (
+                            shifts.loc[index_swap, ["employee_id", "employee"]],
+                            shifts.loc[index, ["employee_id", "employee"]],
+                        )
+                        sucessful_swaps = True
+                        counter = 0
+                    else:
+                        sucessful_swaps = False
+                        print("\n\nDidnt work, trying next weekend\n\n")
+                        break
+
+            employees.loc[i, "free_weekend"] = week
+
+        weekends = shifts[shifts["is_weekend"]].groupby("week")["employee"].unique()
+
+        l = []
+        for employee in employees["name"]:
+            for weekend in weekends:
+                if employee not in weekend:
+                    l.append(employee)
+
+        print([e for e in employees["name"] if e not in l])
+
+        self.__employees = employees
+        self.__shifts = shifts
+
+        employees.sort_values("hours_worked")
+
+    def find_solution(self):
         self.create_shifts()
 
         # Initialize solutions and scores
@@ -367,21 +586,8 @@ class Manager:
                 )
             ]
 
-            # # Get number of necessary employees
-            # n_necessary = tomorrow_shifts.groupby("area").size()
-
-            # # Get number of available employees
-            # n_available = self.employees[n_necessary.index].sum()
-
-            # Account for employees that are working on evening shifts today
             today_shifts = previous_shifts[previous_shifts["date"] == shift["date"]]
-            # unavailable_i = solution[today_shifts.index].tolist()
-            # n_available.sub(
-            #     self.employees.loc[unavailable_i, self._Manager__areas].sum()
-            # )
 
-            # Create pool of employees that can work on this shift but also could work
-            # on other areas tomorrow
             pool = self.employees[
                 (self.employees[shift["area"]])
                 & (self.employees[tomorrow_shifts["area"].unique()]).any(axis=1)
@@ -440,412 +646,113 @@ class Manager:
             scores.append(-np.var(hours_worked))
         return np.array(scores)
 
+    def export_results(self, inputs_areas) -> None:
+        shifts = self.shifts.copy()
+        employees = self.employees
+        shifts["sort_key"] = shifts["period"].map({"M": 0, "E": 1, "A": 2})
+        areas = shifts.sort_values("sort_key")["area"].unique()
 
-GA_params = dict(n_solutions=10)
-manager = Manager(2023, 8, GA_params)
+        data_all = []
 
-inputs_areas = pd.read_excel(
-    r"C:\Users\brene\Dropbox\shift_manager\areas.xlsx", keep_default_na=False
-)
-for _, row in inputs_areas.iterrows():
-    # _, row = next(areas.iterrows())
-    row[5] = row[5].replace(" ", "").split(",")
-    row[8] = row[8].replace(" ", "").split(",")
-    manager.add_shift_params(*row)
-manager.shifts_params
-
-employees = pd.read_excel(
-    r"C:\Users\brene\Dropbox\shift_manager\employees.xlsx",
-)
-employees = employees.fillna(False)
-for col in employees.columns[1:]:
-    employees[col] = employees[col].astype(bool)
-for _, row in employees.iterrows():
-    name = row[0]
-    manager.add_employee(name, employees.columns[1:][row[1:]].values)
-inputs_areas
-
-# %%
-
-manager.create_schedule()
-
-# %%
-
-
-def find_conflicts(shift, shifts):
-    conflicts = []
-
-    # Can not work on two shifts at the same time
-    conflicts.extend(shifts[(shift["date"] == shifts["date"])].index)
-
-    # If evening shift, check if employee i is working
-    # - yesterday on an evening shift
-    # - tomorrow on an afternoon/evening shift
-    # - tomorrow on a long morning shift if it is a weekend
-    if shift["period"] == EVENING:
-        conflicts.extend(
-            shifts[
-                (shift["date"] - pd.DateOffset(days=1) == (shifts["date"]))
-                | (shift["date"] + pd.DateOffset(days=1) == (shifts["date"]))
-                | (
-                    (shift["date"].day + 1 == shifts["date"].dt.day)
-                    & (shifts["period"] == AFTERNOON)
-                )
-                | (
-                    (shift["date"].day + 1 == shifts["date"].dt.day)
-                    & (shifts["period"] == MORNING)
-                    & (shifts["duration"] > 5)
-                    # & (shifts["is_weekend"])
-                )
-            ].index
-        )
-
-    # If long morning shift on weekend check if employee i is working
-    # - yesterday on an evening shift
-    # - today's evening shift
-    if shift["period"] == MORNING and shift["duration"] >= 12:
-        conflicts.extend(
-            shifts[
-                (
-                    (shift["date"].day - 1 == shifts["date"].dt.day)
-                    & (shifts["period"] == EVENING)
-                )
-                | (shift["date"].day == shifts["date"].dt.day)
-            ].index
-        )
-
-    return conflicts
-
-
-# %%
-# if True:
-seed(1)
-shifts = manager.shifts.copy()
-employees = manager.employees.copy()
-employees["free_weekend"] = ""
-weekends_shifts = shifts[shifts["is_weekend"]]
-weeks = shifts[shifts["is_weekend"]]["week"].unique()
-# Loop through employees
-
-for i in employees.index:
-    weekends_shifts = shifts[(shifts["is_weekend"]) & (shifts["employee_id"] == i)]
-    if weekends_shifts.empty:
-        continue
-
-    sucessful_swaps = False
-    counter = 0
-    while not sucessful_swaps:
-        counter += 1
-        if counter > 15:
-            print(f"Could not find a free weekend for {employees.iloc[int(i)]['name']}")
-            week = -1
-            break
-        week = choices(weeks)[0]
-        free_weekend_shifts = shifts[
-            (shifts["is_weekend"])
-            & (shifts["employee_id"] == i)
-            & (shifts["week"] == week)
-        ]
-
-        # Loop through shifts this weekend and replace them
-        for index in free_weekend_shifts.index:
-            # Choose people that are already working the most this weekend
-            shifts_this_weekend = shifts[
-                (shifts["is_weekend"])
-                & (shifts["employee_id"] != i)
-                & (shifts["week"] == week)
-            ]
-            # If empty then try another weekend
-            if shifts_this_weekend.empty:
-                continue
-
-            shift = free_weekend_shifts.loc[index]
-
-            candidates = shifts[(shifts["area"] == shift["area"])][
-                "employee_id"
-            ].unique()
-            candidates = candidates[employees.loc[candidates]["free_weekend"] != week]
-
-            # If evening shift, dont consider people that are working on
-            # tomorrow's or yesterday's evening shift
-            exclude = []
-            if shift["period"] == EVENING:
-                exclude.extend(
-                    shifts_this_weekend[
-                        (
-                            (
-                                shifts_this_weekend["date"]
-                                == (shift["date"] + pd.DateOffset(days=1))
-                            )
-                            | (
-                                shifts_this_weekend["date"].dt.day
-                                == (shift["date"] - pd.DateOffset(days=1))
-                            )
-                        )
-                    ]["employee_id"].astype(int)
-                )
-
-            # If evening shift, don't consider people that worked on long morning
-            # shifts today or tomorrow
-            if shift["period"] == EVENING:
-                exclude.extend(
-                    shifts_this_weekend[
-                        (
-                            (shifts_this_weekend["date"].dt.day == shift["date"].day)
-                            | (
-                                shifts_this_weekend["date"].dt.day
-                                == (shift["date"].day + 1)
-                            )
-                        )
-                        & (shifts_this_weekend["period"] == MORNING)
-                        & (shifts_this_weekend["duration"] >= 12)
-                    ]["employee_id"].astype(int)
-                )
-
-            # If long morning shift, dont consider people that are working
-            # on today's and yesterday's evening shift
-            if shift["period"] == MORNING and shift["duration"] >= 12:
-                exclude.extend(
-                    shifts_this_weekend[
-                        (shifts_this_weekend["date"].dt.day == (shift["date"].day - 1))
-                        & (shifts_this_weekend["date"].dt.day == (shift["date"].day))
-                        & (shifts_this_weekend["period"] == EVENING)
-                    ]["employee_id"].astype(int)
-                )
-
-            exclude.extend(
-                shifts_this_weekend[shifts_this_weekend["date"] == shift["date"]][
-                    "employee_id"
-                ].astype(int)
-            )
-            candidates = [c for c in candidates if c not in exclude]
-
-            # Try to switch shifts with candidates
-            swap = []
-            for j in candidates:
-                # List all shifts of the same kind of this candidate that are on other weekends
-                shifts_swap = shifts[
-                    (shifts["employee_id"] == j)
-                    & (shifts["area"] == shift["area"])
-                    & (shifts["duration"] == shift["duration"])
-                    & ~(shifts["is_weekend"] & (shifts["week"] == shift["week"]))
-                    & ~(
-                        shifts["is_weekend"]
-                        & (shifts["week"] == employees.loc[j, "free_weekend"])
-                    )
-                    & (shifts["date"] != shift["date"])
-                ]
-
-                shifts_i = shifts[(shifts["employee_id"] == i)]
-                shifts_j = shifts[(shifts["employee_id"] == j)]
-
-                for _, shift_ in shifts_swap.iterrows():
-                    conflicts = find_conflicts(shift_, shifts_i)
-                    conflicts.extend(find_conflicts(shift, shifts_j))
-                    if conflicts:
+        for week_i in shifts.week.unique():
+            shifts_week = shifts[shifts["week"] == week_i]
+            for period_i, period in enumerate([MORNING, AFTERNOON, EVENING]):
+                shifts_time = shifts_week[shifts_week["period"] == period]
+                for area_i, area in enumerate(areas):
+                    shifts_area = shifts_time[shifts_time["area"] == area]
+                    if shifts_area.empty:
                         continue
-                    else:
-                        swap.append(shift_)
+                    for weekday_i in [0, 1, 2, 3, 4, 5, 6]:
+                        shifts_weekday = shifts_area[
+                            shifts_area["date"].dt.weekday == weekday_i
+                        ]
+                        texts = ["-"]
+                        if not shifts_weekday.empty:
+                            e = shifts_weekday["employee"].tolist()
+                            until_afternoon = (shifts_weekday["duration"] > 5) & (
+                                shifts_weekday["period"] == MORNING
+                            )
+                            texts = []
+                            for name, flag in zip(e, until_afternoon):
+                                if flag:
+                                    text = name + " (MANHÃ E TARDE)"
+                                else:
+                                    text = name
+                                texts.append(text)
+                        for i, text in enumerate(texts):
+                            data_all.append(
+                                [week_i, period_i, area, weekday_i, i, text]
+                            )
 
-            if swap:
-                shift_to_swap = choices(swap)[0]
-                index_swap = shifts[shifts["name"] == shift_to_swap["name"]].index[0]
-                print("Swapping:")
-                print(
-                    f'{shifts.loc[index, ["name", "employee"]]} with \n{shifts.loc[index_swap, ["name", "employee"]]}\n\n'
+        df = pd.DataFrame(
+            data_all,
+            columns=["SEMANA", "PERIODO", "AREA", "DIA DA SEMANA", "i", "RESIDENTE"],
+        )
+
+        df.head(10)
+        df = df.pivot(
+            index=["SEMANA", "PERIODO", "AREA", "i"],
+            columns="DIA DA SEMANA",
+            values="RESIDENTE",
+        )
+        df.columns = df.columns.map(
+            {0: "SEG", 1: "TER", 2: "QUA", 3: "QUI", 4: "SEX", 5: "SAB", 6: "DOM"}
+        )
+        df.index = df.index.set_levels(["MANHA", "TARDE", "NOITE"], level=1)
+        df = df.fillna("-")
+        df
+
+        # People that are working in only one area
+        one_area_person = employees[employees.select_dtypes(bool).sum(axis=1) == 1]
+        one_area_person = one_area_person.select_dtypes(bool).sum() > 0
+        one_area_person = one_area_person[one_area_person].index
+        df = df.drop(level="AREA", index=one_area_person)
+
+        # Areas that have only one person and must be filled
+        one_person_area = employees.select_dtypes(bool).sum()
+        one_person_area = one_person_area[one_person_area == 1].index
+        must_not_be_filled = inputs_areas[inputs_areas["Obrigatorio"] != 1]["Area"]
+        one_person_area = one_person_area[~one_person_area.isin(must_not_be_filled)]
+        df = df.drop(level="AREA", index=one_person_area)
+
+        def format_sheet(sheet, df):
+            sheet.autofit()
+            for column in df:
+                column_length = 30
+                col_idx = df.columns.get_loc(column) + 4
+                sheet.set_column(col_idx, col_idx, column_length)
+
+            sheet.freeze_panes(1, 3)
+
+            # Color by area
+            colors = iter([plt.cm.tab20(i) for i in range(20)])
+            color = defaultdict(lambda: next(colors))
+            for i, (indexes, row) in enumerate(df.iterrows()):
+                week, period, area, ii = indexes
+                sheet.set_row(
+                    i + 1,
+                    20,
+                    writer.book.add_format({"bg_color": rgb2hex(color[area])}),
                 )
-                (
-                    shifts.loc[index, ["employee_id", "employee"]],
-                    shifts.loc[index_swap, ["employee_id", "employee"]],
-                ) = (
-                    shifts.loc[index_swap, ["employee_id", "employee"]],
-                    shifts.loc[index, ["employee_id", "employee"]],
+
+            # Hide column of index i
+            sheet.set_column("D:D", None, None, {"hidden": True})
+            sheet.set_column("L:XFD", None, None, {"hidden": True})
+
+        with pd.ExcelWriter(r"schedule.xlsx") as writer:
+            df.to_excel(writer, sheet_name="Escala", index=True)
+            format_sheet(writer.sheets["Escala"], df)
+
+            for name in employees["name"]:
+                df_ = df.apply(lambda row: row == name).apply(
+                    lambda col: col.map({False: "", True: name}), axis=1
                 )
-                sucessful_swaps = True
-                counter = 0
-            else:
-                sucessful_swaps = False
-                print("\n\nDidnt work, trying next weekend\n\n")
-                break
+                df_2 = df.apply(lambda row: row == name + " (MANHÃ E TARDE)").apply(
+                    lambda col: col.map({False: "", True: name + " (MANHÃ E TARDE)"}),
+                    axis=1,
+                )
+                df_ = df_ + df_2
+                df_ = df_[(~(df_ == ["", "", "", "", "", "", ""])).any(axis=1)]
 
-    employees.loc[i, "free_weekend"] = week
-
-weekends = shifts[shifts["is_weekend"]].groupby("week")["employee"].unique()
-
-l = []
-for employee in employees["name"]:
-    for weekend in weekends:
-        if employee not in weekend:
-            l.append(employee)
-
-print([e for e in employees["name"] if e not in l])
-
-employees.sort_values("hours_worked")
-# shifts[shifts["employee"] == "Maria Guerra"]
-
-# %%
-# shifts = manager.shifts.copy()
-shifts["day"] = shifts["date"].dt.day
-
-shifts[(shifts["period"] == MORNING) & (shifts["duration"] > 5)]
-shifts["sort_key"] = shifts["period"].map({"M": 0, "E": 1, "A": 2})
-areas = shifts.sort_values("sort_key")["area"].unique()
-areas
-
-max_employees = inputs_areas["N_Residentes"].max()
-
-data_all = []
-
-for week_i in shifts.week.unique():
-    shifts_week = shifts[shifts["week"] == week_i]
-    for period_i, period in enumerate([MORNING, AFTERNOON, EVENING]):
-        shifts_time = shifts_week[shifts_week["period"] == period]
-        for area_i, area in enumerate(areas):
-            shifts_area = shifts_time[shifts_time["area"] == area]
-            if shifts_area.empty:
-                continue
-            for weekday_i in [0, 1, 2, 3, 4, 5, 6]:
-                shifts_weekday = shifts_area[
-                    shifts_area["date"].dt.weekday == weekday_i
-                ]
-                texts = ["-"]
-                if not shifts_weekday.empty:
-                    e = shifts_weekday["employee"].tolist()
-                    until_afternoon = (shifts_weekday["duration"] > 5) & (
-                        shifts_weekday["period"] == MORNING
-                    )
-                    texts = []
-                    for name, flag in zip(e, until_afternoon):
-                        if flag:
-                            text = name + " (MANHÃ E TARDE)"
-                        else:
-                            text = name
-                        texts.append(text)
-                for i, text in enumerate(texts):
-                    data_all.append([week_i, period_i, area, weekday_i, i, text])
-
-df = pd.DataFrame(
-    data_all,
-    columns=["SEMANA", "PERIODO", "AREA", "DIA DA SEMANA", "i", "RESIDENTE"],
-)
-
-df.head(10)
-df = df.pivot(
-    index=["SEMANA", "PERIODO", "AREA", "i"],
-    columns="DIA DA SEMANA",
-    values="RESIDENTE",
-)
-df.columns = df.columns.map(
-    {0: "SEG", 1: "TER", 2: "QUA", 3: "QUI", 4: "SEX", 5: "SAB", 6: "DOM"}
-)
-df.index = df.index.set_levels(["MANHA", "TARDE", "NOITE"], level=1)
-df = df.fillna("-")
-df
-
-# People that are working in only one area
-one_area_person = employees[employees.select_dtypes(bool).sum(axis=1) == 1]
-one_area_person = one_area_person.select_dtypes(bool).sum() > 0
-one_area_person = one_area_person[one_area_person].index
-df = df.drop(level="AREA", index=one_area_person)
-
-# Areas that have only one person and must be filled
-one_person_area = employees.select_dtypes(bool).sum()
-one_person_area = one_person_area[one_person_area == 1].index
-must_not_be_filled = inputs_areas[inputs_areas["Obrigatorio"] != 1]["Area"]
-one_person_area = one_person_area[~one_person_area.isin(must_not_be_filled)]
-df = df.drop(level="AREA", index=one_person_area)
-
-df.head(30)
-
-
-# df.transform(lambda row: 'Leticia' in row.tolist() )
-def filter_employee(name_to_filter, name):
-    print(name_to_filter)
-    if name == name_to_filter:
-        return name
-    else:
-        return "-"
-
-
-def add_to_format(existing_format, dict_of_properties, workbook):
-    """Give a format you want to extend and a dict of the properties you want to
-    extend it with, and you get them returned in a single format"""
-    new_dict = {}
-    for key, value in existing_format.__dict__.iteritems():
-        if (value != 0) and (value != {}) and (value != None):
-            new_dict[key] = value
-    del new_dict["escapes"]
-
-    return workbook.add_format(dict(new_dict.items() + dict_of_properties.items()))
-
-
-def box(workbook, sheet_name, row_start, col_start, row_stop, col_stop):
-    """Makes an RxC box. Use integers, not the 'A1' format"""
-
-    rows = row_stop - row_start + 1
-    cols = col_stop - col_start + 1
-
-    for x in xrange((rows) * (cols)):  # Total number of cells in the rectangle
-        box_form = workbook.add_format()  # The format resets each loop
-        row = row_start + (x // cols)
-        column = col_start + (x % cols)
-
-        if x < (cols):  # If it's on the top row
-            box_form = add_to_format(box_form, {"top": 1}, workbook)
-        if x >= ((rows * cols) - cols):  # If it's on the bottom row
-            box_form = add_to_format(box_form, {"bottom": 1}, workbook)
-        if x % cols == 0:  # If it's on the left column
-            box_form = add_to_format(box_form, {"left": 1}, workbook)
-        if x % cols == (cols - 1):  # If it's on the right column
-            box_form = add_to_format(box_form, {"right": 1}, workbook)
-
-        sheet_name.write(row, column, "", box_form)
-
-
-def format_sheet(sheet, df):
-    sheet.autofit()
-    for column in df:
-        column_length = 30
-        col_idx = df.columns.get_loc(column) + 4
-        sheet.set_column(col_idx, col_idx, column_length)
-
-    sheet.freeze_panes(1, 3)
-
-    # Color by area
-    colors = iter([plt.cm.tab20(i) for i in range(20)])
-    color = defaultdict(lambda: next(colors))
-    for i, (indexes, row) in enumerate(df.iterrows()):
-        week, period, area, ii = indexes
-        sheet.set_row(
-            i + 1, 20, writer.book.add_format({"bg_color": rgb2hex(color[area])})
-        )
-
-    # Hide column of index i
-    sheet.set_column("D:D", None, None, {"hidden": True})
-    sheet.set_column("L:XFD", None, None, {"hidden": True})
-
-
-with pd.ExcelWriter(r"../test.xlsx") as writer:
-    df.to_excel(writer, sheet_name="Escala", index=True)
-    format_sheet(writer.sheets["Escala"], df)
-
-    for name in employees["name"]:
-        df_ = df.apply(lambda row: row == name).apply(
-            lambda col: col.map({False: "", True: name}), axis=1
-        )
-        df_2 = df.apply(lambda row: row == name + " (MANHÃ E TARDE)").apply(
-            lambda col: col.map({False: "", True: name + " (MANHÃ E TARDE)"}),
-            axis=1,
-        )
-        df_ = df_ + df_2
-        df_ = df_[(~(df_ == ["", "", "", "", "", "", ""])).any(axis=1)]
-
-        df_.to_excel(writer, sheet_name=name, index=True)
-        format_sheet(writer.sheets[name], df_)
-
-
-shifts[(shifts["area"] == "Gineco_Cirurgia") & (shifts["duration"] > 5)].groupby(
-    "employee"
-).size()
-
-shifts[(shifts["area"] == "Puerperio_Ambulatorio")].groupby("employee").size()
+                df_.to_excel(writer, sheet_name=name, index=True)
+                format_sheet(writer.sheets[name], df_)
