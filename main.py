@@ -2,7 +2,7 @@
 from src.manager import Manager
 import pandas as pd
 
-GA_params = dict(n_solutions=5)
+GA_params = dict(n_solutions=1)
 manager = Manager(2023, 9, GA_params)
 
 inputs_areas = pd.read_excel("inputs.xlsx", keep_default_na=False, sheet_name="areas")
@@ -12,6 +12,7 @@ for _, row in inputs_areas.iterrows():
     manager.add_shift_params(*row)
 manager.shifts_params
 
+# %%
 employees = pd.read_excel("inputs.xlsx", sheet_name="employees")
 employees = employees.fillna(False)
 for col in employees.columns[1:]:
@@ -22,8 +23,11 @@ for _, row in employees.iterrows():
 inputs_areas
 
 # %%
+constraints = pd.read_excel("inputs.xlsx", sheet_name="constraints")
+manager.add_constraints(constraints)
+# %%
 manager.create_schedule()
-
+# %%
 manager.export_results(inputs_areas)
 
 # %%

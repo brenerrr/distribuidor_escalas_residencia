@@ -1,5 +1,5 @@
 # %%
-
+from random import shuffle
 from collections import defaultdict
 from matplotlib import pyplot as plt
 from src.common_types import *
@@ -19,6 +19,7 @@ class Manager:
         self.__employees = pd.DataFrame([])
         self.__shifts_params = list()
         self.__GA_params = GA_params
+        self.__constraints = pd.DataFrame([])
         self.__shifts = pd.DataFrame(
             [], columns=["name", "area", "date", "duration", "period"]
         )
@@ -106,6 +107,9 @@ class Manager:
         self.__employees = pd.concat(
             [self.__employees, pd.DataFrame(employee)]
         ).reset_index(drop=True)
+
+    def add_constraints(self, constraints: pd.DataFrame):
+        self.__constraints = constraints
 
     def create_shifts(self) -> pd.DataFrame:
         start = pd.to_datetime(f"{self.__start_date}")
@@ -219,6 +223,8 @@ class Manager:
         employees = pd.merge(employees, hours_worked, left_index=True, right_index=True)
         self.__employees = employees
 
+        self.drop_extra_shifts()
+
         self.create_free_weekends()
 
     def create_free_weekends(self) -> None:
@@ -227,11 +233,11 @@ class Manager:
         shifts = self.shifts.copy()
         employees = self.employees
         employees["free_weekend"] = ""
-        weekends_shifts = shifts[shifts["is_weekend"]]
-        weeks = shifts[shifts["is_weekend"]]["week"].unique()
+        weekends_shifts = shifts.loc[shifts["is_weekend"]]
+        weeks = shifts.loc[shifts["is_weekend"]]["week"].unique()
         # Loop through employees
 
-        for i in employees.index:
+        for i in employees.index[:-1]:
             weekends_shifts = shifts[
                 (shifts["is_weekend"]) & (shifts["employee_id"] == i)
             ]
@@ -782,3 +788,33 @@ class Manager:
 
                 df_.to_excel(writer, sheet_name=name, index=True)
                 format_sheet(writer.sheets[name], df_)
+
+    def drop_extra_shifts(self):
+        constraints = self.__constraints
+        self.__employees.loc[self.n_employees] = 0
+        self.__employees.loc[self.n_employees - 1, "name"] = "R+"
+        for _, constraint in constraints.iterrows():
+            area = constraint["Area"]
+            max_shifts = constraint["MaxShifts"]
+            employees = self.employees[self.employees[area] > max_shifts]
+            n_extra = employees[area] - max_shifts
+            for i, n in n_extra.items():
+                shifts = self.shifts[
+                    (self.shifts["employee_id"] == i) & (self.shifts["area"] == area)
+                ]
+                indexes = shifts.index.values.copy()
+                shuffle(indexes)
+                i_exclude = indexes[: int(n)]
+                self.__shifts.loc[i_exclude, ["employee", "employee_id"]] = [
+                    "R+",
+                    self.n_employees - 1,
+                ]
+
+                self.__employees.loc[i]["hours_worked"] -= shifts.loc[i_exclude][
+                    "duration"
+                ].sum()
+                self.__employees.loc[i, area] -= n
+                self.__employees.loc[self.n_employees - 1, area] += n
+                self.__employees.loc[self.n_employees - 1, 'hours_worked'] += shifts.loc[i_exclude][
+                    "duration"
+                ].sum()
