@@ -2,8 +2,8 @@
 from src.manager import Manager
 import pandas as pd
 
-GA_params = dict(n_solutions=20)
-manager = Manager(2023, 8, GA_params)
+GA_params = dict(n_solutions=5)
+manager = Manager(2023, 9, GA_params)
 
 inputs_areas = pd.read_excel("inputs.xlsx", keep_default_na=False, sheet_name="areas")
 for _, row in inputs_areas.iterrows():
@@ -21,7 +21,7 @@ for _, row in employees.iterrows():
     manager.add_employee(name, employees.columns[1:][row[1:]].values)
 inputs_areas
 
-
+# %%
 manager.create_schedule()
 
 manager.export_results(inputs_areas)

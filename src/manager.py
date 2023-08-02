@@ -70,6 +70,7 @@ class Manager:
             for date in exclude_dates:
                 if date == "":
                     continue
+                print(f"Excluding {date} for shift {name}")
                 date = pd.to_datetime(f"{date} {START_TIMES_STR[period]}")
                 dates = dates[~(dates == date)]
 
@@ -487,7 +488,7 @@ class Manager:
                 # If there are no eligible employees, start again
                 if (cost_matrix >= LARGE_NUMBER).all():
                     if shift["must_be_filled"]:
-                        print(f"Trying generating another initial solution {c} {i} {j}")
+                        print(f"Trying generating another initial solution {i} {j}")
                         print(shift["name"])
                         c += 1
                         i = previous_shifts[
@@ -534,6 +535,31 @@ class Manager:
         # Only one shift per employee
         same_time_shifts = previous_shifts[previous_shifts["date"] == shift["date"]]
         cost[solution[same_time_shifts.index]] = LARGE_NUMBER
+
+        # If another area with shifts at the same time needs all of its employees,
+        # do not assign them to this shift
+        same_time_shifts = self.shifts[
+            (self.shifts.date == shift.date) & (self.shifts["area"] != shift["area"])
+        ]
+        if not same_time_shifts.empty:
+            iN = self.shifts[self.shifts["name"] == shift["name"]].index[0]
+            i0 = same_time_shifts.index[0]
+            i_areas = same_time_shifts["area"].str.split("_").str[0]
+            n_necessary = same_time_shifts.loc[iN:].groupby(i_areas).size()
+            areas = n_necessary.index
+            # Count number of available employees per area
+            i_exclude = solution[i0:iN]
+            n_available = self.employees[~self.employees.index.isin(i_exclude)][
+                areas
+            ].sum()
+            n_available = n_available[n_necessary.index]
+
+            # Exclude employees that are already working on shifts at the same time
+            full_areas = areas[n_available == n_necessary]
+            i_unavailable = self.employees[
+                self.employees[self._Manager__areas][full_areas].sum(axis=1) > 0
+            ].index
+            cost[i_unavailable] = LARGE_NUMBER
 
         # If worked yesterday evening, can't work this afternoon or evening
         # Also not able to work next morning if work goes until afternoon
