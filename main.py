@@ -30,7 +30,7 @@ manager.add_constraints(constraints)
 # %%
 manager.create_schedule()
 # %%
-manager.export_results(inputs_areas)
+manager.export_results(inputs_areas, month)
 
 # %%
 manager.employees.sort_values("hours_worked").to_csv(f"horas_trabalhadas_{month}.csv")

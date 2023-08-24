@@ -678,7 +678,7 @@ class Manager:
             scores.append(-np.var(hours_worked))
         return np.array(scores)
 
-    def export_results(self, inputs_areas) -> None:
+    def export_results(self, inputs_areas, month) -> None:
         shifts = self.shifts.copy()
         employees = self.employees
         shifts["sort_key"] = shifts["period"].map({"M": 0, "E": 1, "A": 2})
@@ -771,7 +771,7 @@ class Manager:
             sheet.set_column("D:D", None, None, {"hidden": True})
             sheet.set_column("L:XFD", None, None, {"hidden": True})
 
-        with pd.ExcelWriter(r"escala.xlsx") as writer:
+        with pd.ExcelWriter(f"escala_{month}.xlsx") as writer:
             df.to_excel(writer, sheet_name="Escala", index=True)
             format_sheet(writer.sheets["Escala"], df)
 
