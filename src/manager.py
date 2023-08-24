@@ -64,7 +64,7 @@ class Manager:
             dates_ = pd.date_range(
                 start_date,
                 end_date,
-                freq=f"W-{day}",
+                freq=f"W-{DAYS_PORT2ENG[day]}",
             )
             dates = dates.union(dates_)
         if exclude_dates is not None:
@@ -248,7 +248,7 @@ class Manager:
             counter = 0
             while not sucessful_swaps:
                 counter += 1
-                if counter > 15:
+                if counter > 50:
                     print(
                         f"Could not find a free weekend for {employees.iloc[int(i)]['name']}"
                     )
@@ -275,9 +275,9 @@ class Manager:
 
                     shift = free_weekend_shifts.loc[index]
 
-                    candidates = shifts[(shifts["area"] == shift["area"])][
-                        "employee_id"
-                    ].unique()
+                    candidates = shifts[
+                        (shifts["area"] == shift["area"]) & (shifts["employee_id"] != i)
+                    ]["employee_id"].unique()
                     candidates = candidates[
                         employees.loc[candidates]["free_weekend"] != week
                     ]
@@ -743,7 +743,7 @@ class Manager:
         # Areas that have only one person and must be filled
         one_person_area = employees.select_dtypes(bool).sum()
         one_person_area = one_person_area[one_person_area == 1].index
-        must_not_be_filled = inputs_areas[inputs_areas["Obrigatorio"] != 1]["Area"]
+        must_not_be_filled = inputs_areas[inputs_areas["Obrigatório"] != 1]["Área"]
         one_person_area = one_person_area[~one_person_area.isin(must_not_be_filled)]
         df = df.drop(level="AREA", index=one_person_area)
 
@@ -771,7 +771,7 @@ class Manager:
             sheet.set_column("D:D", None, None, {"hidden": True})
             sheet.set_column("L:XFD", None, None, {"hidden": True})
 
-        with pd.ExcelWriter(r"schedule.xlsx") as writer:
+        with pd.ExcelWriter(r"escala.xlsx") as writer:
             df.to_excel(writer, sheet_name="Escala", index=True)
             format_sheet(writer.sheets["Escala"], df)
 
@@ -794,8 +794,8 @@ class Manager:
         self.__employees.loc[self.n_employees] = 0
         self.__employees.loc[self.n_employees - 1, "name"] = "R+"
         for _, constraint in constraints.iterrows():
-            area = constraint["Area"]
-            max_shifts = constraint["MaxShifts"]
+            area = constraint["Área"]
+            max_shifts = constraint["MaxTurnos"]
             employees = self.employees[self.employees[area] > max_shifts]
             n_extra = employees[area] - max_shifts
             for i, n in n_extra.items():
@@ -810,11 +810,11 @@ class Manager:
                     self.n_employees - 1,
                 ]
 
-                self.__employees.loc[i]["hours_worked"] -= shifts.loc[i_exclude][
+                self.__employees.loc[i, "hours_worked"] -= shifts.loc[i_exclude][
                     "duration"
                 ].sum()
                 self.__employees.loc[i, area] -= n
                 self.__employees.loc[self.n_employees - 1, area] += n
-                self.__employees.loc[self.n_employees - 1, 'hours_worked'] += shifts.loc[i_exclude][
-                    "duration"
-                ].sum()
+                self.__employees.loc[
+                    self.n_employees - 1, "hours_worked"
+                ] += shifts.loc[i_exclude]["duration"].sum()

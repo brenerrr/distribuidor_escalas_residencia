@@ -2,10 +2,12 @@
 from src.manager import Manager
 import pandas as pd
 
-GA_params = dict(n_solutions=1)
-manager = Manager(2023, 9, GA_params)
+GA_params = dict(n_solutions=4)
 
-inputs_areas = pd.read_excel("inputs.xlsx", keep_default_na=False, sheet_name="areas")
+month = pd.read_excel("inputs.xlsx", keep_default_na=False, sheet_name="mês").columns[0]
+manager = Manager(2023, month, GA_params)
+
+inputs_areas = pd.read_excel("inputs.xlsx", keep_default_na=False, sheet_name="áreas")
 for _, row in inputs_areas.iterrows():
     row[5] = row[5].replace(" ", "").split(",")
     row[8] = row[8].replace(" ", "").split(",")
@@ -13,7 +15,7 @@ for _, row in inputs_areas.iterrows():
 manager.shifts_params
 
 # %%
-employees = pd.read_excel("inputs.xlsx", sheet_name="employees")
+employees = pd.read_excel("inputs.xlsx", sheet_name="funcionários")
 employees = employees.fillna(False)
 for col in employees.columns[1:]:
     employees[col] = employees[col].astype(bool)
@@ -23,7 +25,7 @@ for _, row in employees.iterrows():
 inputs_areas
 
 # %%
-constraints = pd.read_excel("inputs.xlsx", sheet_name="constraints")
+constraints = pd.read_excel("inputs.xlsx", sheet_name="condições")
 manager.add_constraints(constraints)
 # %%
 manager.create_schedule()
@@ -31,5 +33,5 @@ manager.create_schedule()
 manager.export_results(inputs_areas)
 
 # %%
-manager.employees.sort_values("hours_worked").to_csv("hours_worked.csv")
-manager.employees.sort_values("hours_worked")
+manager.employees.sort_values("hours_worked").to_csv(f"horas_trabalhadas_{month}.csv")
+manager.employees.sort_values(f"hours_worked")
