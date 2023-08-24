@@ -24,6 +24,7 @@ class Manager:
             [], columns=["name", "area", "date", "duration", "period"]
         )
         self.__areas = []
+        self.__timeoff = pd.DataFrame([])
 
     @property
     def shifts_params(self):
@@ -40,6 +41,13 @@ class Manager:
     @property
     def shifts(self):
         return self.__shifts
+
+    @property
+    def timeoff(self):
+        return self.__timeoff
+
+    def add_timeoff(self, timeoff: pd.DataFrame):
+        self.__timeoff = timeoff
 
     def add_shift_params(
         self,
@@ -100,7 +108,6 @@ class Manager:
             + f"Employee areas: {working_areas}"
         )
         assert all(area in areas for area in working_areas), message
-        # employee.id = len(self.__employees)
         employee = dict(name=[name], hours_worked=[0])
         employee.update({area: [area in working_areas] for area in areas})
 
@@ -152,11 +159,16 @@ class Manager:
         shifts["employee_id"] = ""
         self.__shifts = shifts
 
-    def find_conflicts(self, shift, shifts):
+    def find_conflicts(self, shift, shifts, timeoff):
         conflicts = []
 
         # Can not work on two shifts at the same time
         conflicts.extend(shifts[(shift["date"] == shifts["date"])].index)
+
+        # Can not work on shifts that are on timeoff
+        if not timeoff.empty:
+            if any(shift["date"].day == timeoff.dt.day):
+                conflicts.extend([0])
 
         # If evening shift, check if employee i is working
         # - yesterday on an evening shift
@@ -365,10 +377,14 @@ class Manager:
 
                         shifts_i = shifts[(shifts["employee_id"] == i)]
                         shifts_j = shifts[(shifts["employee_id"] == j)]
+                        timeoff_i = pd.Series(self.timeoff.get(i))
+                        timeoff_j = pd.Series(self.timeoff.get(j))
 
                         for _, shift_ in shifts_swap.iterrows():
-                            conflicts = self.find_conflicts(shift_, shifts_i)
-                            conflicts.extend(self.find_conflicts(shift, shifts_j))
+                            conflicts = self.find_conflicts(shift_, shifts_i, timeoff_i)
+                            conflicts.extend(
+                                self.find_conflicts(shift, shifts_j, timeoff_j)
+                            )
                             if conflicts:
                                 continue
                             else:
@@ -527,6 +543,10 @@ class Manager:
         next_shifts: pd.DataFrame = None,
     ) -> pd.Series:
         cost = np.zeros(self.n_employees)
+
+        # Try to not assign someone who is in timeoff
+        i = self.timeoff[shift.date.day == self.timeoff.dt.day].index.values
+        cost[i] = LARGE_NUMBER - 1
 
         # Only work on right areas
         cost += (~self.employees[shift["area"]]) * LARGE_NUMBER
