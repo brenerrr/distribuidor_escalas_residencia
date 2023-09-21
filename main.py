@@ -2,16 +2,15 @@
 from src.manager import Manager
 import pandas as pd
 
-GA_params = dict(n_solutions=4)
+GA_params = dict(n_solutions=20)
 
 month = pd.read_excel("inputs.xlsx", keep_default_na=False, sheet_name="mês").columns[0]
 manager = Manager(2023, month, GA_params)
 
-timeoff = pd.read_excel("inputs.xlsx", keep_default_na=False, sheet_name="folgas")
-timeoff = timeoff[timeoff["Datas"] != ""]
-timeoff = timeoff["Datas"].str.split(",").explode().str.strip()
-timeoff = pd.to_datetime(timeoff)
-manager.add_timeoff(timeoff)
+timeoff_inputs = pd.read_excel(
+    "inputs.xlsx", keep_default_na=False, sheet_name="folgas"
+)
+manager.add_timeoff(timeoff_inputs)
 
 areas = pd.read_excel("inputs.xlsx", keep_default_na=False, sheet_name="áreas")
 for _, row in areas.iterrows():

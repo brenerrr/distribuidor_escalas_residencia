@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 from src.common_types import *
 import pandas as pd
 import numpy as np
-from random import choices, seed
+from random import choices, seed, shuffle
 from matplotlib.colors import rgb2hex
 
 np.random.seed(1)
@@ -24,7 +24,7 @@ class Manager:
             [], columns=["name", "area", "date", "duration", "period"]
         )
         self.__areas = []
-        self.__timeoff = pd.DataFrame([])
+        self.__timeoff = pd.Series([])
 
     @property
     def shifts_params(self):
@@ -46,8 +46,20 @@ class Manager:
     def timeoff(self):
         return self.__timeoff
 
-    def add_timeoff(self, timeoff: pd.DataFrame):
-        self.__timeoff = timeoff
+    def add_timeoff(self, timeoff_inputs: pd.DataFrame):
+        timeoff_inputs = timeoff_inputs[timeoff_inputs["Datas"] != ""]
+        timeoff_inputs = timeoff_inputs["Datas"].str.split(",").explode().str.strip()
+        dates = timeoff_inputs.str.extract("(\d{4}-\d{2}-\d{2})", expand=False)
+        periods = timeoff_inputs.str.extract("\((.*?)\)", expand=False)
+        timeoff = []
+        index = []
+        for i, date, period in zip(dates.index, dates, periods):
+            for p in period:
+                index.append(i)
+                start = pd.to_datetime(f"{date} {START_TIMES_STR[p]}")
+                end = start + pd.offsets.Hour(DURATION_TIMES[p])
+                timeoff.append(pd.Interval(start, end, closed="left"))
+        self.__timeoff = pd.Series(timeoff, index=index)
 
     def add_shift_params(
         self,
@@ -152,7 +164,7 @@ class Manager:
                         )
 
         #  Sort shifts chronollogically
-        shifts.sort(key=lambda x: (x["date"].day, x["date"].hour, -x["duration"]))
+        shifts.sort(key=lambda x: (x["date"].day, x["date"].hour, x["duration"]))
 
         shifts = pd.DataFrame(shifts)
         shifts["employee"] = ""
@@ -167,7 +179,19 @@ class Manager:
 
         # Can not work on shifts that are on timeoff
         if not timeoff.empty:
-            if any(shift["date"].day == timeoff.dt.day):
+            shift_start = shift["date"]
+            shift_end = (
+                shift["date"]
+                + pd.offsets.Hour(shift["duration"] // 1)
+                + pd.offsets.Minute((shift["duration"] % 1) * 60)
+            )
+            shift_interval = pd.Interval(shift_start, shift_end)
+            i_timeoff = [
+                i
+                for i, interval in self.timeoff.items()
+                if shift_interval.overlaps(interval)
+            ]
+            if len(i_timeoff) > 0:
                 conflicts.extend([0])
 
         # If evening shift, check if employee i is working
@@ -246,27 +270,44 @@ class Manager:
         employees = self.employees
         employees["free_weekend"] = ""
         weekends_shifts = shifts.loc[shifts["is_weekend"]]
-        weeks = shifts.loc[shifts["is_weekend"]]["week"].unique()
-        # Loop through employees
 
-        for i in employees.index[:-1]:
+        # Only consider a weekend if there are at least 2 days
+        weeks_all = shifts.loc[shifts["is_weekend"]]["week"].unique().tolist()
+        weeks = []
+        for week in weeks_all:
+            days_in_weekend = weekends_shifts[weekends_shifts["week"] == week][
+                "date"
+            ].dt.day.unique()
+            if days_in_weekend.size > 1:
+                weeks.append(week)
+
+        # Loop through employees
+        pool = employees.index[:-1]
+        counter = defaultdict(lambda: 0)
+        while not pool.empty:
+            i = choices(pool)[0]
             weekends_shifts = shifts[
                 (shifts["is_weekend"]) & (shifts["employee_id"] == i)
             ]
+
             if weekends_shifts.empty:
+                pool = pool.drop(i)
                 continue
 
+            if counter[employees.loc[i, "name"]] > 50:
+                print(f"Could not find a free weekend for {employees.loc[i, 'name']}")
+                pool = pool.drop(i)
+
             sucessful_swaps = False
-            counter = 0
+            week_pool = weeks.copy()
+            shuffle(week_pool)
             while not sucessful_swaps:
-                counter += 1
-                if counter > 50:
-                    print(
-                        f"Could not find a free weekend for {employees.iloc[int(i)]['name']}"
-                    )
-                    week = -1
+                # Try other employee if week pool is empty
+                if len(week_pool) == 0:
+                    counter[employees.loc[i, "name"]] += 1
                     break
-                week = choices(weeks)[0]
+
+                week = week_pool.pop()
                 free_weekend_shifts = shifts[
                     (shifts["is_weekend"])
                     & (shifts["employee_id"] == i)
@@ -395,10 +436,10 @@ class Manager:
                         index_swap = shifts[
                             shifts["name"] == shift_to_swap["name"]
                         ].index[0]
-                        print("Swapping:")
-                        print(
-                            f'{shifts.loc[index, ["name", "employee"]]} with \n{shifts.loc[index_swap, ["name", "employee"]]}\n\n'
-                        )
+                        # print("Swapping:")
+                        # print(
+                        #     f'{shifts.loc[index, ["name", "employee"]]} with \n{shifts.loc[index_swap, ["name", "employee"]]}\n\n'
+                        # )
                         (
                             shifts.loc[index, ["employee_id", "employee"]],
                             shifts.loc[index_swap, ["employee_id", "employee"]],
@@ -407,28 +448,29 @@ class Manager:
                             shifts.loc[index, ["employee_id", "employee"]],
                         )
                         sucessful_swaps = True
-                        counter = 0
                     else:
                         sucessful_swaps = False
-                        print("\n\nDidnt work, trying next weekend\n\n")
+                        # print("\n\nDidnt work, trying next weekend\n\n")
                         break
 
-            employees.loc[i, "free_weekend"] = week
+                if free_weekend_shifts.empty:
+                    sucessful_swaps = True
+
+            if sucessful_swaps:
+                employees.loc[i, "free_weekend"] = week
+                print(f"Found free weekend for {employees.loc[i,'name']}")
+                pool = pool.drop(i)
 
         weekends = shifts[shifts["is_weekend"]].groupby("week")["employee"].unique()
 
-        l = []
-        for employee in employees["name"]:
-            for weekend in weekends:
+        employees["free_weekend"] = ""
+        for i, employee in employees["name"].items():
+            for j, weekend in weekends.items():
                 if employee not in weekend:
-                    l.append(employee)
-
-        print([e for e in employees["name"] if e not in l])
+                    employees.loc[i, "free_weekend"] += f"{j} "
 
         self.__employees = employees
         self.__shifts = shifts
-
-        employees.sort_values("hours_worked")
 
     def find_solution(self):
         self.create_shifts()
@@ -449,36 +491,10 @@ class Manager:
         # plt.show(block=True)
         return best
 
-    def pick_best_solutions(self, scores: np.array):
-        # message = "Not enough valid scores. Try increasing population."
-        # assert (scores > 0).sum() >= 2, message
-        # prob = scores / scores.sum()
-        # best_solutions_i = np.random.choice(prob.size, 2, p=prob, replace=False)
-        best_solutions_i = scores.argsort()[-2:]
-        return best_solutions_i
-
-    def mutate(self, solutions: np.array, shifts: pd.DataFrame) -> np.array:
-        mutation_rate = self.__GA_params["mutation_rate"]
-        mask = np.random.choice(
-            [True, False], solutions.shape, p=[mutation_rate, 1 - mutation_rate]
-        )
-
-        random_values = np.random.randint(0, self.n_employees, solutions.shape)
-        new_solutions = solutions * (1 - mask) + random_values * mask
-        return new_solutions
-
-    def crossover(self, solutions: pd.DataFrame) -> pd.DataFrame:
-        solution1, solution2 = solutions.T.values
-        ci = np.random.randint(0, solution1.size)
-        offspring1 = np.concatenate([solution1[:ci], solution2[ci:]])
-        offspring2 = np.concatenate([solution2[:ci], solution1[ci:]])
-        # return np.stack((offspring1, offspring2)).T
-        return pd.DataFrame(offspring1.reshape(-1, 1))
-
     def create_solutions(
         self, n_solutions: int, guide: pd.DataFrame = None
     ) -> pd.DataFrame:
-        shifts = self.shifts
+        shifts = self.shifts.loc[::-1].reset_index()
         solutions = np.full((shifts.shape[0], n_solutions), np.nan)
         solutions = pd.DataFrame(solutions)
 
@@ -488,38 +504,39 @@ class Manager:
 
             # Loop through shifts
             i = 0
-            while i <= shifts.index[-1]:
+            while i < shifts.shape[0]:
+                # print(i)
                 shift = shifts.iloc[i]
 
-                next_shifts = shifts.iloc[i + 1 :]
+                # next_shifts = shifts.iloc[i + 1 :]
 
-                # Do not consider shifts without solutions
+                # # Do not consider shifts without solutions
                 ii = solutions.loc[: i - 1, j] >= 0
-                previous_shifts = shifts.loc[: i - 1]
+                next_shifts = shifts.loc[: i - 1]
                 solution = solutions.loc[: i - 1, j]
-                previous_shifts = previous_shifts[ii].reset_index(drop=True)
+                next_shifts = next_shifts[ii].reset_index(drop=True)
                 solution = solution[ii].reset_index(drop=True)
+
+                # # previous_shifts = shifts.iloc[i + 1 :]
+                # next_shifts = shifts.iloc[:i] if i > 0 else pd.DataFrame()
+                # solution = solutions.loc[: i - 1, j].values
 
                 cost_matrix = self.calculate_costs(
                     shift,
-                    solution.values,
-                    previous_shifts,
+                    solution,
                     next_shifts,
                 )
 
                 # If there are no eligible employees, start again
                 if (cost_matrix >= LARGE_NUMBER).all():
-                    if shift["must_be_filled"]:
-                        print(f"Trying generating another initial solution {i} {j}")
-                        print(shift["name"])
-                        c += 1
-                        i = previous_shifts[
-                            previous_shifts["date"].dt.day == (shift["date"].day - 10)
-                        ]
-                        i = 0 if i.empty else i.index[0]
-                        continue
-                    else:
-                        solutions.loc[i, j] = -1
+                    print(f"Trying generating another initial solution {i} {j}")
+                    print(shift["name"])
+                    c += 1
+                    i = next_shifts[
+                        next_shifts["date"].dt.day == (shift["date"].day - 7)
+                    ]
+                    i = 0 if i.empty else i.index[0]
+                    continue
                 else:
                     # The eligible employees with the most amount of hours worked
                     # will not be considered
@@ -531,144 +548,152 @@ class Manager:
                     else:
                         solutions.loc[i, j] = np.argmin(cost_matrix)
 
+                # Find optional shifts that should not be worked
+                next_shifts_all = shifts.iloc[:i] if i > 0 else pd.DataFrame()
+                if shift["period"] == EVENING and not next_shifts_all.empty:
+                    optional = next_shifts_all[
+                        (next_shifts_all["date"].dt.day == (shift["date"].day + 1))
+                        & (
+                            (next_shifts_all["period"] == AFTERNOON)
+                            | (next_shifts_all["period"] == EVENING)
+                        )
+                        & (~next_shifts_all["must_be_filled"])
+                    ]
+                    if not optional.empty:
+                        employee = solutions.loc[i, j]
+                        for ii, _ in optional.iterrows():
+                            optional_employee = solutions.loc[ii, j]
+                            if optional_employee == employee:
+                                solutions.loc[ii, j] = -1
+
                 i += 1
-            print
-        return solutions
+        return solutions.loc[::-1, :].reset_index(drop=True)
 
     def calculate_costs(
         self,
         shift: pd.DataFrame,
         solution: np.array = None,
-        previous_shifts: pd.DataFrame = None,
         next_shifts: pd.DataFrame = None,
     ) -> pd.Series:
         cost = np.zeros(self.n_employees)
 
-        # Try to not assign someone who is in timeoff
-        i = self.timeoff[shift.date.day == self.timeoff.dt.day].index.values
-        cost[i] = LARGE_NUMBER - 1
-
         # Only work on right areas
         cost += (~self.employees[shift["area"]]) * LARGE_NUMBER
 
-        if previous_shifts.empty or solution is None:
+        if next_shifts.empty or solution is None:
             return cost
 
+        # Try to not assign someone who is in timeoff
+        shift_start = shift["date"]
+        shift_end = (
+            shift["date"]
+            + pd.offsets.Hour(shift["duration"] // 1)
+            + pd.offsets.Minute((shift["duration"] % 1) * 60)
+        )
+        shift_interval = pd.Interval(shift_start, shift_end)
+        i_timeoff = [
+            i
+            for i, interval in self.timeoff.items()
+            if shift_interval.overlaps(interval)
+        ]
+        i_timeoff = np.array(i_timeoff)
+        if i_timeoff.size > 0:
+            cost[i_timeoff] = LARGE_NUMBER - 1
+
         # Add hours worked
-        hours_worked = previous_shifts.groupby(solution)["duration"].sum()
+        hours_worked = next_shifts.groupby(solution)["duration"].sum()
         cost[hours_worked.index] += hours_worked
 
         # Only one shift per employee
-        same_time_shifts = previous_shifts[previous_shifts["date"] == shift["date"]]
+        same_time_shifts = next_shifts[next_shifts["date"] == shift["date"]]
         cost[solution[same_time_shifts.index]] = LARGE_NUMBER
 
-        # If another area with shifts at the same time needs all of its employees,
-        # do not assign them to this shift
-        same_time_shifts = self.shifts[
-            (self.shifts.date == shift.date) & (self.shifts["area"] != shift["area"])
+        # Do not assign employees from areas that need all of them
+        # in shifts at the same time
+        same_time_previous = self.shifts[
+            (self.shifts.date == shift.date) & (self.shifts.index < shift["index"])
         ]
-        if not same_time_shifts.empty:
-            iN = self.shifts[self.shifts["name"] == shift["name"]].index[0]
-            i0 = same_time_shifts.index[0]
-            i_areas = same_time_shifts["area"].str.split("_").str[0]
-            n_necessary = same_time_shifts.loc[iN:].groupby(i_areas).size()
-            areas = n_necessary.index
-            # Count number of available employees per area
-            i_exclude = solution[i0:iN]
-            n_available = self.employees[~self.employees.index.isin(i_exclude)][
-                areas
-            ].sum()
-            n_available = n_available[n_necessary.index]
-
-            # Exclude employees that are already working on shifts at the same time
-            full_areas = areas[n_available == n_necessary]
-            i_unavailable = self.employees[
-                self.employees[self._Manager__areas][full_areas].sum(axis=1) > 0
-            ].index
-            cost[i_unavailable] = LARGE_NUMBER
-
-        # If worked yesterday evening, can't work this afternoon or evening
-        # Also not able to work next morning if work goes until afternoon
-        if shift["period"] in (EVENING, AFTERNOON) or (
-            (shift["duration"] > 5) and (shift["period"] == MORNING)
-        ):
-            yesterday_evening = shift["date"] - pd.offsets.Day(1)
-            yesterday_evening = yesterday_evening.replace(hour=START_TIMES[EVENING])
-            yesterday_evening_shifts = previous_shifts[
-                (previous_shifts["date"] == yesterday_evening)
-            ]
-            cost[solution[yesterday_evening_shifts.index]] = LARGE_NUMBER
-
-        # On weekends, can not work evening shift if worked long morning shift
-        if shift["period"] == EVENING and shift["is_weekend"]:
-            this_weekend = previous_shifts[
-                (previous_shifts["is_weekend"])
-                & (previous_shifts["week"] == shift["week"])
-                & (previous_shifts["period"] == MORNING)
-                & (previous_shifts["duration"] >= 12)
-            ]
-            cost[solution[this_weekend.index]] = LARGE_NUMBER
-
-        # If someone is working on a shift that starts in the morning but
-        # goes until the afternoon, than this person can't get another shift
-        # in the afternoon
         if shift["period"] == AFTERNOON:
-            morning_shifts = previous_shifts[
-                (previous_shifts["date"].dt.date == shift["date"].date())
-                & (previous_shifts["period"] == MORNING)
-                & (previous_shifts["duration"] > 5)
+            long_morning_shifts = self.shifts[
+                (self.shifts["date"].dt.day == shift["date"].day)
+                & (self.shifts["period"] == MORNING)
+                & (self.shifts["duration"] > 5)
             ]
-            cost[solution[morning_shifts.index]] = LARGE_NUMBER
 
-        # Dont assign evening shifts if an area tomorrow does not have
-        # more employees available than necessary
-        if shift["period"] == EVENING:
-            tomorrow = shift["date"] + pd.offsets.Day(1)
+            same_time_previous = pd.concat((same_time_previous, long_morning_shifts))
+            same_time_previous = same_time_previous.sort_index()
+
+        areas = self.employees[self.employees[shift["area"]]][
+            self._Manager__areas
+        ].sum()
+        areas = areas[areas > 0].index
+        same_time_previous = same_time_previous[same_time_previous["area"].isin(areas)]
+        if not same_time_previous.empty:
+            # Create pool with employees that can work on same_time_previous
+            i_areas = same_time_previous["area"].str.split("_").str[0].unique()
+            pool = self.employees[self.employees[i_areas].sum(axis=1) > 0]
+
+            # Do not consider the ones who are already working now
+            pool = pool.drop(index=solution[same_time_shifts.index], errors="ignore")
+
+            # Loop through shifts and take employees out of the pool
+            for _, shift_ in same_time_previous.iterrows():
+                i = pool[pool[shift_["area"]]]
+                pool = pool.drop(index=i.index[0])
+
+            # Get employees from areas that are no in the pool anymore
+            # and make them unselectable
+            areas_exclude = pool[self._Manager__areas].sum()
+            areas_exclude = areas_exclude[areas_exclude <= 0].index
+            areas_exclude = areas_exclude[areas_exclude.isin(i_areas)].values
+
+            i_exclude = self.employees[
+                self.employees[areas_exclude].sum(axis=1) > 0
+            ].index
+            cost[i_exclude] = LARGE_NUMBER
+
+        # If working tomorrow evening, afternoon or long morning,
+        # can not work this evening
+        if shift["period"] in (EVENING):
+            tomorrow_evening = shift["date"] + pd.offsets.Day(1)
+            tomorrow_morning = tomorrow_evening.replace(hour=START_TIMES[MORNING])
+            tomorrow_afternoon = tomorrow_evening.replace(hour=START_TIMES[AFTERNOON])
             tomorrow_shifts = next_shifts[
-                (next_shifts["date"].dt.date == tomorrow.date())
-                & (
-                    (
-                        (next_shifts["period"].isin((AFTERNOON,)))
-                        & next_shifts["must_be_filled"]
-                    )
-                    | (
-                        (next_shifts["period"] == MORNING)
-                        & (next_shifts["duration"] > 5)
-                    )
+                (
+                    (next_shifts["date"] == tomorrow_evening)
+                    & (next_shifts["must_be_filled"])
+                )
+                | (
+                    (next_shifts["date"] == tomorrow_afternoon)
+                    & next_shifts["must_be_filled"]
+                )
+                | (
+                    (next_shifts["date"] == tomorrow_morning)
+                    & (next_shifts["duration"] > 5)
+                    & (next_shifts["must_be_filled"])
                 )
             ]
+            cost[solution[tomorrow_shifts.index]] = LARGE_NUMBER
 
-            today_shifts = previous_shifts[previous_shifts["date"] == shift["date"]]
-
-            pool = self.employees[
-                (self.employees[shift["area"]])
-                & (self.employees[tomorrow_shifts["area"].unique()]).any(axis=1)
+        # On weekends, can not work evening shift if worked long morning shift
+        if (
+            shift["period"] == MORNING
+            and shift["is_weekend"]
+            and shift["duration"] >= 12
+        ):
+            evening_shifts = next_shifts[
+                (next_shifts["date"].dt.day == shift["date"].day)
+                & (next_shifts["period"] == EVENING)
             ]
-            pool = pool.drop(solution[today_shifts.index], errors="ignore")
+            cost[solution[evening_shifts.index]] = LARGE_NUMBER
 
-            # Get areas where workers on pool can also be assigned to
-            areas = tomorrow_shifts["area"].unique()
-            pool_areas = pool[self._Manager__areas].any()
-            pool_areas = pool_areas[pool_areas].index
-            areas = [area for area in areas if area in pool_areas]
-
-            # Get rid of shifts that do not have intersecting employees
-            tomorrow_shifts = tomorrow_shifts[tomorrow_shifts["area"].isin(areas)]
-
-            # Loop through shifts and drop employees from pool
-            for _, tomorrow_shift in tomorrow_shifts.iterrows():
-                area_pool = pool[pool[tomorrow_shift["area"]]]
-                pool = pool.drop(area_pool.index[0])
-
-            # Identify areas that have no spare employees
-            areas_spare = [area for area in areas if pool[area].any()]
-            areas_no_spare = [area for area in areas if area not in areas_spare]
-
-            unavailable_i = self.employees[
-                self.employees[areas_no_spare].any(axis=1)
-            ].index
-
-            cost[unavailable_i] = LARGE_NUMBER
+        # If working in the afternoon, can not work on long morning shifts
+        if shift["period"] == MORNING and shift["duration"] > 5:
+            afternoon_shifts = next_shifts[
+                (next_shifts["date"].dt.date == shift["date"].date())
+                & (next_shifts["period"] == AFTERNOON)
+            ]
+            cost[solution[afternoon_shifts.index]] = LARGE_NUMBER
 
         # If this shift is part of the should be balanced category,
         # then people that had a lot of shifts in this area should not
@@ -679,10 +704,10 @@ class Manager:
             )
             available = available.fillna(0)
             unique, counts = np.unique(
-                solution[previous_shifts["area"] == shift["area"]], return_counts=True
+                solution[next_shifts["area"] == shift["area"]], return_counts=True
             )
             available[unique] = counts
-            available = available[(cost < LARGE_NUMBER)]
+            available = available[(cost < LARGE_NUMBER - 1)]
             cost[available.index] = available
 
         return cost
@@ -813,6 +838,7 @@ class Manager:
         constraints = self.__constraints
         self.__employees.loc[self.n_employees] = 0
         self.__employees.loc[self.n_employees - 1, "name"] = "R+"
+
         for _, constraint in constraints.iterrows():
             area = constraint["Área"]
             max_shifts = constraint["MaxTurnos"]
@@ -822,6 +848,14 @@ class Manager:
                 shifts = self.shifts[
                     (self.shifts["employee_id"] == i) & (self.shifts["area"] == area)
                 ]
+
+                # Drop shifts that have only one employee
+                single_e_dates = (
+                    self.shifts[self.shifts["area"] == area].groupby("date").size()
+                )
+                single_e_dates = single_e_dates[single_e_dates < 2].index
+                shifts = shifts[~(shifts["date"].isin(single_e_dates))]
+
                 indexes = shifts.index.values.copy()
                 shuffle(indexes)
                 i_exclude = indexes[: int(n)]
