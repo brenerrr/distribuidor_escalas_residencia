@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>811</width>
+    <height>628</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QTabWidget" name="tabWidget">
+    <property name="geometry">
+     <rect>
+      <x>-1</x>
+      <y>0</y>
+      <width>821</width>
+      <height>600</height>
+     </rect>
+    </property>
+    <property name="currentIndex">
+     <number>0</number>
+    </property>
+    <widget class="QWidget" name="tabAreas">
+     <attribute name="title">
+      <string>Áreas</string>
+     </attribute>
+     <widget class="QGroupBox" name="gb_areas">
+      <property name="geometry">
+       <rect>
+        <x>40</x>
+        <y>20</y>
+        <width>291</width>
+        <height>541</height>
+       </rect>
+      </property>
+      <property name="title">
+       <string>Áreas</string>
+      </property>
+      <widget class="QTextEdit" name="input_area">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>20</y>
+         <width>131</width>
+         <height>31</height>
+        </rect>
+       </property>
+       <property name="html">
+        <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'MS Shell Dlg 2'; font-size:8pt; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;br /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="placeholderText">
+        <string>Insira a nova área</string>
+       </property>
+      </widget>
+      <widget class="QTableWidget" name="table_areas">
+       <property name="geometry">
+        <rect>
+         <x>150</x>
+         <y>10</y>
+         <width>131</width>
+         <height>521</height>
+        </rect>
+       </property>
+       <property name="showGrid">
+        <bool>false</bool>
+       </property>
+       <property name="columnCount">
+        <number>1</number>
+       </property>
+       <attribute name="horizontalHeaderVisible">
+        <bool>false</bool>
+       </attribute>
+       <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
+        <bool>false</bool>
+       </attribute>
+       <attribute name="verticalHeaderVisible">
+        <bool>true</bool>
+       </attribute>
+       <column/>
+      </widget>
+      <widget class="QPushButton" name="button_add_area">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>60</y>
+         <width>131</width>
+         <height>51</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>Adicionar</string>
+       </property>
+      </widget>
+     </widget>
+     <widget class="QGroupBox" name="gb_employee">
+      <property name="geometry">
+       <rect>
+        <x>470</x>
+        <y>20</y>
+        <width>291</width>
+        <height>521</height>
+       </rect>
+      </property>
+      <property name="title">
+       <string>Pessoas</string>
+      </property>
+      <widget class="QTextEdit" name="input_employee">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>20</y>
+         <width>131</width>
+         <height>31</height>
+        </rect>
+       </property>
+       <property name="html">
+        <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'MS Shell Dlg 2'; font-size:8pt; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;br /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="placeholderText">
+        <string>Insira a nova pessoa</string>
+       </property>
+      </widget>
+      <widget class="QTableWidget" name="table_employees">
+       <property name="geometry">
+        <rect>
+         <x>150</x>
+         <y>10</y>
+         <width>131</width>
+         <height>511</height>
+        </rect>
+       </property>
+       <property name="showGrid">
+        <bool>false</bool>
+       </property>
+       <property name="columnCount">
+        <number>1</number>
+       </property>
+       <attribute name="horizontalHeaderVisible">
+        <bool>false</bool>
+       </attribute>
+       <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
+        <bool>false</bool>
+       </attribute>
+       <attribute name="verticalHeaderVisible">
+        <bool>true</bool>
+       </attribute>
+       <column/>
+      </widget>
+      <widget class="QPushButton" name="button_add_employee">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>60</y>
+         <width>131</width>
+         <height>51</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>Adicionar</string>
+       </property>
+      </widget>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="tabEmployees">
+     <attribute name="title">
+      <string>Pessoas</string>
+     </attribute>
+    </widget>
+   </widget>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
