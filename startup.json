@@ -1,33 +1,5 @@
 {
     "month": "Mai",
-    "areas": [
-        "Plantao",
-        "Puerperio",
-        "Puerperio_Ambulatorio",
-        "Gineco",
-        "Gineco_Cirurgia",
-        "AltoRisco",
-        "Ambulatorio",
-        "SalaParto",
-        "Permanencia",
-        "Evolucao",
-        "BaixoRisco"
-    ],
-    "employees": [
-        "Henrique",
-        "Jessika",
-        "Isabelle",
-        "Rafaela",
-        "Giovanna",
-        "Ana Luiza",
-        "Joyce",
-        "Lilian",
-        "Vitoria",
-        "Duda",
-        "Iara",
-        "Marcela",
-        "Camila"
-    ],
     "employees_areas": {
         "Henrique": {
             "Plantao": false,
@@ -173,6 +145,34 @@
             "BaixoRisco": false
         }
     },
+    "areas": [
+        "Plantao",
+        "Puerperio",
+        "Puerperio_Ambulatorio",
+        "Gineco",
+        "Gineco_Cirurgia",
+        "AltoRisco",
+        "Ambulatorio",
+        "SalaParto",
+        "Permanencia",
+        "Evolucao",
+        "BaixoRisco"
+    ],
+    "employees": [
+        "Henrique",
+        "Jessika",
+        "Isabelle",
+        "Rafaela",
+        "Giovanna",
+        "Ana Luiza",
+        "Joyce",
+        "Lilian",
+        "Vitoria",
+        "Duda",
+        "Iara",
+        "Marcela",
+        "Camila"
+    ],
     "shifts": [
         {
             "Nome": "Plantao_Noturno",
@@ -217,6 +217,41 @@
             "Balancear": "",
             "Dura\u00e7\u00e3o": "5.0",
             "Exce\u00e7\u00f5es": "12/10/2023"
+        },
+        {
+            "Nome": "Henrique",
+            "Per\u00edodo": "01/05/2023",
+            "\u00c1rea": "Manh\u00e3",
+            "Qtd. Pessoas": "",
+            "Dias": "",
+            "Obrigat\u00f3rio": "",
+            "Balancear": "",
+            "Dura\u00e7\u00e3o": "",
+            "Exce\u00e7\u00f5es": ""
+        },
+        {
+            "Nome": "Vitoria",
+            "Per\u00edodo": "04/05/2023",
+            "\u00c1rea": "Manh\u00e3",
+            "Qtd. Pessoas": "",
+            "Dias": "",
+            "Obrigat\u00f3rio": "",
+            "Balancear": "",
+            "Dura\u00e7\u00e3o": "",
+            "Exce\u00e7\u00f5es": ""
+        }
+    ],
+    "timeoff": [
+        {
+            "Nome": "Henrique",
+            "Data": "01/05/2023",
+            "Per\u00edodo": "Manh\u00e3"
+        }
+    ],
+    "restrictions": [
+        {
+            "\u00c1rea": "Plantao",
+            "Qtd. M\u00e1xima de Turnos": "8"
         }
     ]
 }

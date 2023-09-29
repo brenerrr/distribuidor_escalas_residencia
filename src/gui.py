@@ -29,11 +29,18 @@ class Ui(QMainWindow):
         super(Ui, self).__init__()  # Call the inherited classes __init__ method
         uic.loadUi("src\\manager.ui", self)  # Load the .ui file
         self.initialize_variables()
-        self.startup_values = startup_values
+        self.startup_values = defaultdict(lambda: {})
+        self.startup_values.update(startup_values)
         self.populate_widgets_startup()
         self.setup_signals()
         self.format_tables_columns(
-            [self.table_areas, self.table_employees, self.table_shiftException]
+            [
+                self.table_areas,
+                self.table_employees,
+                self.table_shiftException,
+                self.table_timeoff,
+                self.table_restrictions,
+            ]
         )
 
     @property
@@ -47,7 +54,7 @@ class Ui(QMainWindow):
     def initialize_variables(self):
         self.employees_areas = None
         self.selected_dates = defaultdict(lambda: list())
-        self.table_shifts_header = [
+        self.header_shifts = [
             "Nome",
             "Período",
             "Área",
@@ -58,6 +65,8 @@ class Ui(QMainWindow):
             "Duração",
             "Exceções",
         ]
+        self.header_timeoff = ["Nome", "Data", "Período"]
+        self.header_restrictions = ["Área", "Qtd. Máxima de Turnos"]
 
     def read_table(self, table):
         n_rows = table.rowCount()
@@ -110,7 +119,8 @@ class Ui(QMainWindow):
                 if i == n_columns - 1:
                     policy = QHeaderView.Stretch
                 else:
-                    policy = QHeaderView.ResizeToContents
+                    policy = QHeaderView.Stretch
+                    # policy = QHeaderView.ResizeToContents
                 table.horizontalHeader().setSectionResizeMode(i, policy)
 
     def setup_signals(self):
@@ -122,37 +132,39 @@ class Ui(QMainWindow):
                 0: lambda: None,
                 1: self.create_tab_areas_employees,
                 2: self.populate_tab_shifts_widgets,
+                3: lambda: None,
             }
             fn = d.get(index)
             fn()
 
         tab.currentChanged.connect(tab_fn)
 
-        # Tab Inputs
-        # Add area button
+        # Press buttons
         self.button_addArea.clicked.connect(self.add_area)
         self.button_addEmployee.clicked.connect(self.add_employee)
-        self.drop_month.currentTextChanged.connect(self.export_startup_values)
-
-        # Areas table
-        table: QTableWidget = self.table_areas
-        table.doubleClicked.connect(self.remove_area)
-        table.itemChanged.connect(self.export_startup_values)
-        table.setToolTip("Dois clicks para deletar")
-        self.input_area.installEventFilter(self)
-        self.input_subarea.installEventFilter(self)
-
-        # Employees table
-        table: QTableWidget = self.table_employees
-        table.doubleClicked.connect(self.remove_area)
-        table.itemChanged.connect(self.export_startup_values)
-        table.setToolTip("Dois clicks para deletar")
-        self.input_employee.installEventFilter(self)
-
-        # Tab Shifts
+        self.button_addRestriction.clicked.connect(self.add_restriction)
+        self.button_addTimeoff.clicked.connect(self.add_timeoff)
         self.button_addShift.clicked.connect(self.add_shift)
         self.button_addShiftDate.clicked.connect(self.add_shift_exception)
-        table: QTableWidget = self.table_shifts
+
+        self.drop_month.currentTextChanged.connect(self.export_startup_values)
+
+        # Event filters
+        self.input_area.installEventFilter(self)
+        self.input_subarea.installEventFilter(self)
+        self.input_employee.installEventFilter(self)
+
+        # Tables
+        self.assign_table_signals(self.table_areas)
+        self.assign_table_signals(self.table_employees)
+        self.assign_table_signals(self.table_shifts)
+        self.assign_table_signals(self.table_timeoff)
+        self.assign_table_signals(self.table_restrictions)
+
+        self.table_employees.itemChanged.connect(self.update_dropEmp)
+        self.table_areas.itemChanged.connect(self.update_dropAreas)
+
+    def assign_table_signals(self, table: QTableWidget):
         table.doubleClicked.connect(self.remove_area)
         table.itemChanged.connect(self.export_startup_values)
         table.setToolTip("Dois clicks para deletar")
@@ -187,20 +199,34 @@ class Ui(QMainWindow):
             ),
             shifts=dict(
                 values=[
-                    [shift[header] for header in self.table_shifts_header]
+                    [shift[header] for header in self.header_shifts]
                     for shift in self.startup_values["shifts"]
                 ],
                 obj=self.table_shifts,
+            ),
+            timeoff=dict(
+                values=[
+                    [row[header] for header in self.header_timeoff]
+                    for row in self.startup_values["timeoff"]
+                ],
+                obj=self.table_timeoff,
+            ),
+            restrictions=dict(
+                values=[
+                    [row[header] for header in self.header_restrictions]
+                    for row in self.startup_values["restrictions"]
+                ],
+                obj=self.table_restrictions,
             ),
         )
         for items in tables.values():
             table = items["obj"]
             values = items["values"]
-            self.add_item(table, values)
+            self.add_items(table, values)
 
         # Month dropdown
         comboBox: QComboBox = self.drop_month
-        for month in [
+        months = [
             "Jan",
             "Fev",
             "Mar",
@@ -213,25 +239,42 @@ class Ui(QMainWindow):
             "Out",
             "Nov",
             "Dez",
-        ]:
-            comboBox.addItem(month)
-        comboBox.setCurrentText(startup_values.get("month", "Jan"))
+        ]
+
+        comboBox.addItems(months)
+        monthNow = self.startup_values.get("month", months[datetime.now().month - 1])
+        comboBox.setCurrentText(monthNow)
+
+        # Date edits
+        comboBox.currentIndex()
+        for dateEdit in [self.de_shiftException, self.de_timeoff]:
+            dateEdit.setDate(QDate(datetime.now().year, months.index(monthNow) + 1, 1))
 
         # Tab employees areas
         self.create_tab_areas_employees()
 
-        # Tab shifts
-        comboBox: QComboBox = self.drop_shiftPeriod
-        comboBox.addItems(["Manhã", "Tarde", "Noite"])
+        # Periods dropdowns
+        self.drop_shiftPeriod.addItems(["Manhã", "Tarde", "Noite"])
+        self.drop_timeoffPeriod.addItems(["Manhã", "Tarde", "Noite"])
 
-        table: QTableWidget = self.table_shifts
-        table.setHorizontalHeaderLabels(self.table_shifts_header)
+        # Table headers
+        self.table_shifts.setHorizontalHeaderLabels(self.header_shifts)
+        self.table_timeoff.setHorizontalHeaderLabels(self.header_timeoff)
+        self.table_restrictions.setHorizontalHeaderLabels(self.header_restrictions)
 
-        dateEdit: QDateEdit = self.shiftExceptionDate
-        month = self.drop_month.currentIndex() + 1
-        dateEdit.setDate(QDate(datetime.now().year, month, 1))
+        # Dropdowns
+        self.update_dropEmp()
+        self.update_dropAreas()
 
-    def add_item(self, table: QTableWidget, rows: list):
+    def update_dropEmp(self):
+        for comboBox in [self.drop_timeoffEmp]:
+            comboBox.addItems(self.employees)
+
+    def update_dropAreas(self):
+        for comboBox in [self.drop_restrictionArea, self.drop_shiftArea]:
+            comboBox.addItems(self.areas)
+
+    def add_items(self, table: QTableWidget, rows: list):
         for row in rows:
             n_rows = table.rowCount()
             table.insertRow(n_rows)
@@ -252,7 +295,7 @@ class Ui(QMainWindow):
         if area:
             table: QTableWidget = self.table_areas
             value = QTableWidgetItem(area)
-            self.add_item(table, [value])
+            self.add_items(table, [value])
         self.input_area.clear()
         self.input_subarea.clear()
 
@@ -263,7 +306,7 @@ class Ui(QMainWindow):
         if employee:
             table: QTableWidget = self.table_employees
             value = QTableWidgetItem(employee)
-            self.add_item(table, [value])
+            self.add_items(table, [value])
         self.input_employee.clear()
 
     def remove_area(self, row):
@@ -277,19 +320,7 @@ class Ui(QMainWindow):
         comboBox: QComboBox = self.drop_month
         export_dict["month"] = comboBox.currentText()
 
-        # Areas table
-        table: QTableWidget = self.table_areas
-        export_dict["areas"] = [
-            table.item(i, 0).text() for i in range(table.rowCount())
-        ]
-
-        # Employees table
-        table: QTableWidget = self.table_employees
-        export_dict["employees"] = [
-            table.item(i, 0).text() for i in range(table.rowCount())
-        ]
-
-        # Table that relates employees and areas
+        # Checks that relates employees and areas
         if self.employees_areas is not None:
             d = defaultdict(lambda: dict())
             for employee, checks in self.employees_areas.items():
@@ -299,30 +330,42 @@ class Ui(QMainWindow):
         elif self.startup_values.get("employee_areas") is not None:
             export_dict["employees_areas"] = self.startup_values["employees_areas"]
 
-        # Shifts table
-        table: QTableWidget = self.table_shifts
-        n_rows = table.rowCount()
-        export_dict["shifts"] = []
-        for i in range(n_rows):
-            data = {}
-            for j, header in enumerate(self.table_shifts_header):
-                value = table.item(i, j)
-                if value is None:
-                    value = ""
-                else:
-                    value = value.text()
-                data[header] = value
-            export_dict["shifts"].append(data)
+        # Tables
+        export_dict["areas"] = self.get_table_data(self.table_areas)
+        export_dict["employees"] = self.get_table_data(self.table_employees)
+        export_dict["shifts"] = self.get_table_data(self.table_shifts)
+        export_dict["timeoff"] = self.get_table_data(self.table_timeoff)
+        export_dict["restrictions"] = self.get_table_data(self.table_restrictions)
 
         with open("startup.json", "w") as f:
             json_object = json.dumps(export_dict, indent=4)
             f.write(json_object)
 
+    def get_table_data(self, table: QTableWidget):
+        n_rows = table.rowCount()
+        data = []
+        headers = [table.horizontalHeaderItem(i) for i in range(table.columnCount())]
+        headers = [
+            str(i) if header is None else header.text()
+            for i, header in enumerate(headers)
+        ]
+        for i in range(n_rows):
+            row = {}
+            for j, header in enumerate(headers):
+                value = table.item(i, j)
+                if value is None:
+                    value = ""
+                else:
+                    value = value.text()
+                row[header] = value
+            data.append(row)
+
+        if len(headers) == 1:
+            data = [value[headers[0]] for value in data]
+        return data
+
     def populate_tab_shifts_widgets(self):
-        areas = self.areas.values
-        for area in areas:
-            drop: QComboBox = self.drop_shiftArea
-            drop.addItem(area)
+        self.drop_shiftArea.addItems(self.areas.values)
         pass
 
     def add_shift(self):
@@ -351,15 +394,29 @@ class Ui(QMainWindow):
         table: QTableWidget = self.table_shifts
         i = table.rowCount()
         table.insertRow(i)
-        for j, key in enumerate(self.table_shifts_header):
+        for j, key in enumerate(self.header_shifts):
             table.setItem(i, j, QTableWidgetItem(data[key]))
 
     def add_shift_exception(self):
-        dateEdit: QDateEdit = self.shiftExceptionDate
-        year, month, day = dateEdit.date().getDate()
-        string = f"{day:02d}/{month:02d}/{year}"
+        string = self.get_date(de_shiftException)
         string = QTableWidgetItem(string)
-        self.add_item(self.table_shiftException, [string])
+        self.add_items(self.table_shiftException, [string])
+
+    def add_timeoff(self):
+        employee = self.drop_timeoffEmp.currentText()
+        date = self.get_date(self.de_timeoff)
+        period = self.drop_timeoffPeriod.currentText()
+        self.add_items(self.table_timeoff, [[employee, date, period]])
+
+    def add_restriction(self):
+        area = self.drop_restrictionArea.currentText()
+        n = str(self.sb_restrictionN.value())
+        self.add_items(self.table_restrictions, [[area, n]])
+
+    def get_date(self, widget: QDateEdit):
+        year, month, day = widget.date().getDate()
+        string = f"{day:02d}/{month:02d}/{year}"
+        return string
 
 
 with open("startup.json", "r") as f:
