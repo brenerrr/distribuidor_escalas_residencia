@@ -28,6 +28,7 @@ class Ui(QMainWindow):
     def __init__(self, startup_values: defaultdict):
         super(Ui, self).__init__()  # Call the inherited classes __init__ method
         uic.loadUi("src\\manager.ui", self)  # Load the .ui file
+
         self.initialize_variables()
         self.startup_values = defaultdict(lambda: {})
         self.startup_values.update(startup_values)
@@ -160,6 +161,7 @@ class Ui(QMainWindow):
         self.assign_table_signals(self.table_shifts)
         self.assign_table_signals(self.table_timeoff)
         self.assign_table_signals(self.table_restrictions)
+        self.assign_table_signals(self.table_shiftException)
 
         self.table_employees.itemChanged.connect(self.update_dropEmp)
         self.table_areas.itemChanged.connect(self.update_dropAreas)
@@ -398,7 +400,7 @@ class Ui(QMainWindow):
             table.setItem(i, j, QTableWidgetItem(data[key]))
 
     def add_shift_exception(self):
-        string = self.get_date(de_shiftException)
+        string = self.get_date(self.de_shiftException)
         string = QTableWidgetItem(string)
         self.add_items(self.table_shiftException, [string])
 
