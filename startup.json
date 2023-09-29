@@ -1,10 +1,221 @@
 {
     "areas": [
         "Plantao",
-        "Gineco"
+        "Puerperio",
+        "Puerperio_Ambulatorio",
+        "Gineco",
+        "Gineco_Cirurgia",
+        "AltoRisco",
+        "Ambulatorio",
+        "SalaParto",
+        "Permanencia",
+        "Evolucao",
+        "BaixoRisco"
     ],
     "employees": [
+        "Henrique",
+        "Jessika",
+        "Isabelle",
+        "Rafaela",
+        "Giovanna",
+        "Ana Luiza",
+        "Joyce",
+        "Lilian",
         "Vitoria",
+        "Duda",
+        "Iara",
+        "Marcela",
         "Camila"
+    ],
+    "employees_areas": {
+        "Henrique": {
+            "Plantao": false,
+            "Puerperio": false,
+            "Gineco": false,
+            "AltoRisco": false,
+            "Ambulatorio": false,
+            "SalaParto": false,
+            "Permanencia": false,
+            "Evolucao": false,
+            "BaixoRisco": false
+        },
+        "Jessika": {
+            "Plantao": true,
+            "Puerperio": true,
+            "Gineco": false,
+            "AltoRisco": false,
+            "Ambulatorio": false,
+            "SalaParto": false,
+            "Permanencia": false,
+            "Evolucao": false,
+            "BaixoRisco": false
+        },
+        "Isabelle": {
+            "Plantao": true,
+            "Puerperio": false,
+            "Gineco": false,
+            "AltoRisco": false,
+            "Ambulatorio": false,
+            "SalaParto": false,
+            "Permanencia": false,
+            "Evolucao": false,
+            "BaixoRisco": false
+        },
+        "Rafaela": {
+            "Plantao": true,
+            "Puerperio": false,
+            "Gineco": false,
+            "AltoRisco": false,
+            "Ambulatorio": false,
+            "SalaParto": false,
+            "Permanencia": false,
+            "Evolucao": false,
+            "BaixoRisco": false
+        },
+        "Giovanna": {
+            "Plantao": false,
+            "Puerperio": false,
+            "Gineco": false,
+            "AltoRisco": false,
+            "Ambulatorio": false,
+            "SalaParto": false,
+            "Permanencia": false,
+            "Evolucao": false,
+            "BaixoRisco": false
+        },
+        "Ana Luiza": {
+            "Plantao": false,
+            "Puerperio": false,
+            "Gineco": true,
+            "AltoRisco": false,
+            "Ambulatorio": false,
+            "SalaParto": false,
+            "Permanencia": false,
+            "Evolucao": false,
+            "BaixoRisco": false
+        },
+        "Joyce": {
+            "Plantao": false,
+            "Puerperio": false,
+            "Gineco": false,
+            "AltoRisco": false,
+            "Ambulatorio": false,
+            "SalaParto": false,
+            "Permanencia": false,
+            "Evolucao": false,
+            "BaixoRisco": false
+        },
+        "Lilian": {
+            "Plantao": false,
+            "Puerperio": false,
+            "Gineco": false,
+            "AltoRisco": false,
+            "Ambulatorio": false,
+            "SalaParto": false,
+            "Permanencia": false,
+            "Evolucao": false,
+            "BaixoRisco": false
+        },
+        "Vitoria": {
+            "Plantao": false,
+            "Puerperio": false,
+            "Gineco": false,
+            "AltoRisco": false,
+            "Ambulatorio": false,
+            "SalaParto": false,
+            "Permanencia": false,
+            "Evolucao": false,
+            "BaixoRisco": false
+        },
+        "Duda": {
+            "Plantao": false,
+            "Puerperio": false,
+            "Gineco": false,
+            "AltoRisco": false,
+            "Ambulatorio": false,
+            "SalaParto": false,
+            "Permanencia": false,
+            "Evolucao": false,
+            "BaixoRisco": false
+        },
+        "Iara": {
+            "Plantao": false,
+            "Puerperio": false,
+            "Gineco": false,
+            "AltoRisco": false,
+            "Ambulatorio": false,
+            "SalaParto": false,
+            "Permanencia": false,
+            "Evolucao": false,
+            "BaixoRisco": false
+        },
+        "Marcela": {
+            "Plantao": false,
+            "Puerperio": false,
+            "Gineco": false,
+            "AltoRisco": false,
+            "Ambulatorio": false,
+            "SalaParto": false,
+            "Permanencia": false,
+            "Evolucao": false,
+            "BaixoRisco": false
+        },
+        "Camila": {
+            "Plantao": false,
+            "Puerperio": false,
+            "Gineco": false,
+            "AltoRisco": false,
+            "Ambulatorio": false,
+            "SalaParto": false,
+            "Permanencia": false,
+            "Evolucao": false,
+            "BaixoRisco": false
+        }
+    },
+    "shifts": [
+        {
+            "Nome": "Plantao_Noturno",
+            "Per\u00edodo": "Noite",
+            "\u00c1rea": "Plantao",
+            "Qtd. Pessoas": "2",
+            "Dias": "Ter, Qua, Qui, Sex, S\u00e1b, Dom",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "Sim",
+            "Dura\u00e7\u00e3o": "12.0",
+            "Exce\u00e7\u00f5es": ""
+        },
+        {
+            "Nome": "Plantao_Noturno_Seg",
+            "Per\u00edodo": "Noite",
+            "\u00c1rea": "Plantao",
+            "Qtd. Pessoas": "1",
+            "Dias": "Seg",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "Sim",
+            "Dura\u00e7\u00e3o": "12.0",
+            "Exce\u00e7\u00f5es": ""
+        },
+        {
+            "Nome": "Plantao_Diurno",
+            "Per\u00edodo": "Manh\u00e3",
+            "\u00c1rea": "Plantao",
+            "Qtd. Pessoas": "2",
+            "Dias": "Seg, Ter, Qua, Qui, Sex, S\u00e1b, Dom",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "Sim",
+            "Dura\u00e7\u00e3o": "12.0",
+            "Exce\u00e7\u00f5es": ""
+        },
+        {
+            "Nome": "Puerperio_Manha1",
+            "Per\u00edodo": "Manh\u00e3",
+            "\u00c1rea": "Puerperio",
+            "Qtd. Pessoas": "3",
+            "Dias": "Seg, Qua",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "",
+            "Dura\u00e7\u00e3o": "5.0",
+            "Exce\u00e7\u00f5es": "12/10/2023"
+        }
     ]
 }
