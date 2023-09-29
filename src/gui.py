@@ -1,4 +1,5 @@
-from PyQt5 import uic, QtCore
+from PyQt5 import uic
+from PyQt5.QtCore import Qt, QEvent, QDate
 from PyQt5.QtWidgets import (
     QMainWindow,
     QGridLayout,
@@ -13,6 +14,7 @@ from PyQt5.QtWidgets import (
     QDateEdit,
     QApplication,
 )
+from datetime import datetime
 import sys
 import json
 from collections import defaultdict
@@ -93,7 +95,7 @@ class Ui(QMainWindow):
 
                 layout.addWidget(check, i + 1, j + 1)
                 layout.setColumnStretch(j, 1)
-                layout.setAlignment(check, QtCore.Qt.AlignCenter)
+                layout.setAlignment(check, Qt.AlignCenter)
                 check.stateChanged.connect(self.export_startup_values)
                 checks[employee][area] = check
 
@@ -130,6 +132,7 @@ class Ui(QMainWindow):
         # Add area button
         self.button_addArea.clicked.connect(self.add_area)
         self.button_addEmployee.clicked.connect(self.add_employee)
+        self.drop_month.currentTextChanged.connect(self.export_startup_values)
 
         # Areas table
         table: QTableWidget = self.table_areas
@@ -156,10 +159,10 @@ class Ui(QMainWindow):
 
     def eventFilter(self, obj, event):
         def pressed_Enter(widget):
-            if event.type() == QtCore.QEvent.KeyPress and obj is widget:
+            if event.type() == QEvent.KeyPress and obj is widget:
                 if (
-                    (event.key() == QtCore.Qt.Key.Key_Return)
-                    or (event.key() == QtCore.Qt.Key.Key_Enter)
+                    (event.key() == Qt.Key.Key_Return)
+                    or (event.key() == Qt.Key.Key_Enter)
                 ) and widget.hasFocus():
                     return True
 
@@ -176,7 +179,7 @@ class Ui(QMainWindow):
         return super().eventFilter(obj, event)
 
     def populate_widgets_startup(self):
-        # Tab areas
+        # Tables
         tables = dict(
             areas=dict(values=self.startup_values["areas"], obj=self.table_areas),
             employees=dict(
@@ -195,6 +198,26 @@ class Ui(QMainWindow):
             values = items["values"]
             self.add_item(table, values)
 
+        # Month dropdown
+        comboBox: QComboBox = self.drop_month
+        for month in [
+            "Jan",
+            "Fev",
+            "Mar",
+            "Abr",
+            "Mai",
+            "Jun",
+            "Jul",
+            "Ago",
+            "Set",
+            "Out",
+            "Nov",
+            "Dez",
+        ]:
+            comboBox.addItem(month)
+        comboBox.setCurrentText(startup_values.get("month", "Jan"))
+
+        # Tab employees areas
         self.create_tab_areas_employees()
 
         # Tab shifts
@@ -203,6 +226,10 @@ class Ui(QMainWindow):
 
         table: QTableWidget = self.table_shifts
         table.setHorizontalHeaderLabels(self.table_shifts_header)
+
+        dateEdit: QDateEdit = self.shiftExceptionDate
+        month = self.drop_month.currentIndex() + 1
+        dateEdit.setDate(QDate(datetime.now().year, month, 1))
 
     def add_item(self, table: QTableWidget, rows: list):
         for row in rows:
@@ -246,6 +273,10 @@ class Ui(QMainWindow):
 
     def export_startup_values(self):
         export_dict = {}
+
+        comboBox: QComboBox = self.drop_month
+        export_dict["month"] = comboBox.currentText()
+
         # Areas table
         table: QTableWidget = self.table_areas
         export_dict["areas"] = [
