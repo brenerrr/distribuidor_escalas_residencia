@@ -1,4 +1,5 @@
 # %%
+import json
 from random import shuffle
 from collections import defaultdict
 from matplotlib import pyplot as plt
@@ -13,18 +14,29 @@ seed(1)
 
 
 class Manager:
-    def __init__(self, year: int, month: int, GA_params: dict) -> None:
-        self.__start_date = f"{year}-{month}"
-        # self.__employees = list()
+    def __init__(self, filepath: str) -> None:
+        self.read_inputs(filepath)
+        self.initialize_variables()
+        self.add_shifts_params()
+        self.add_employees()
+        self.add_constraints()
+        self.add_timeoff()
+
+    def initialize_variables(self):
+        self.__start_date = f"{self.i['year']}-{MONTHS_STR2NUM[self.i['month']]}"
         self.__employees = pd.DataFrame([])
         self.__shifts_params = list()
-        self.__GA_params = GA_params
+        self.__n_solutions = 1
         self.__constraints = pd.DataFrame([])
         self.__shifts = pd.DataFrame(
             [], columns=["name", "area", "date", "duration", "period"]
         )
         self.__areas = []
         self.__timeoff = pd.Series([])
+
+    def read_inputs(self, filepath: str):
+        with open(filepath, "r") as f:
+            self.i = json.load(f)
 
     @property
     def shifts_params(self):
@@ -46,48 +58,59 @@ class Manager:
     def timeoff(self):
         return self.__timeoff
 
-    def add_timeoff(self, timeoff_inputs: pd.DataFrame):
-        timeoff_inputs = timeoff_inputs[timeoff_inputs["Datas"] != ""]
-        timeoff_inputs = timeoff_inputs["Datas"].str.split(",").explode().str.strip()
-        dates = timeoff_inputs.str.extract("(\d{4}-\d{2}-\d{2})", expand=False)
-        periods = timeoff_inputs.str.extract("\((.*?)\)", expand=False)
-        timeoff = []
-        index = []
-        for i, date, period in zip(dates.index, dates, periods):
-            for p in period:
-                index.append(i)
-                start = pd.to_datetime(f"{date} {START_TIMES_STR[p]}")
-                end = start + pd.offsets.Hour(DURATION_TIMES[p])
-                timeoff.append(pd.Interval(start, end, closed="left"))
-        self.__timeoff = pd.Series(timeoff, index=index)
+    @property
+    def areas(self):
+        return self.__areas
 
-    def add_shift_params(
-        self,
-        name: str,
-        area: str,
-        duration: int,
-        period: PERIODS_TYPE,
-        n_employees: int,
-        days_of_week: list,
-        should_be_balanced: bool = False,
-        must_be_filled: bool = True,
-        exclude_dates: list = None,
-    ) -> None:
-        assert all(day in DAYS_OF_WEEK for day in days_of_week)
-        assert period in PERIODS
+    def add_timeoff(self):
+        df = pd.DataFrame(self.i["timeoff"])
+        df["Period_Time"] = df[PERIOD].map(
+            lambda x: START_TIMES_STR[PERIOD_TRANSLATE[x]]
+        )
+        df["start"] = pd.to_datetime(
+            df[DATE] + " " + df["Period_Time"], format=r"%d/%m/%Y %H:%M"
+        )
+        df["duration"] = df[PERIOD].map(
+            lambda x: pd.offsets.Hour(DURATION_TIMES[PERIOD_TRANSLATE[x]])
+        )
+        df["end"] = df["start"] + df["duration"]
+        intervals = df.apply(
+            lambda row: pd.Interval(row["start"], row["end"], closed="left"), axis=1
+        )
+        index = df[NAME].map(lambda x: self.i["employees"].index(x))
+        self.__timeoff = pd.Series(intervals.values, index=index)
 
-        # Get dates of shifts in this area
-        dates = pd.DatetimeIndex([])
-        start_date = pd.to_datetime(f"{self.__start_date}-1 {START_TIMES_STR[period]}")
-        end_date = start_date + pd.offsets.MonthEnd()
-        for day in days_of_week:
-            dates_ = pd.date_range(
-                start_date,
-                end_date,
-                freq=f"W-{DAYS_PORT2ENG[day]}",
+    def add_shifts_params(self) -> None:
+        shift = self.i["shifts"][0]
+        for shift in self.i["shifts"]:
+            name = shift[NAME]
+            area = shift[AREA]
+            duration = float(shift[DURATION])
+            period = PERIOD_TRANSLATE[shift[PERIOD]]
+            n_employees = int(shift[N_EMPLOYEES])
+            days_of_week = shift[DAYS].split(", ")
+            should_be_balanced = True if shift[BALANCE] == YES else False
+            must_be_filled = True if shift[MANDATORY] == YES else False
+            exclude_dates = (
+                shift[EXCEPTIONS] if isinstance(shift[EXCEPTIONS], list) else [""]
             )
-            dates = dates.union(dates_)
-        if exclude_dates is not None:
+
+            assert all(day in DAYS_OF_WEEK for day in days_of_week)
+            assert period in PERIODS
+
+            # Get dates of shifts in this area
+            dates = pd.DatetimeIndex([])
+            start_date = pd.to_datetime(
+                f"{self.__start_date}-1 {START_TIMES_STR[period]}"
+            )
+            end_date = start_date + pd.offsets.MonthEnd()
+            for day in days_of_week:
+                dates_ = pd.date_range(
+                    start_date,
+                    end_date,
+                    freq=f"W-{DAYS_PORT2ENG[day]}",
+                )
+                dates = dates.union(dates_)
             for date in exclude_dates:
                 if date == "":
                     continue
@@ -95,40 +118,46 @@ class Manager:
                 date = pd.to_datetime(f"{date} {START_TIMES_STR[period]}")
                 dates = dates[~(dates == date)]
 
-        self.__shifts_params.append(
-            dict(
-                name=name,
-                area=area,
-                duration=duration,
-                period=period,
-                dates=dates,
-                should_be_balanced=should_be_balanced == 1,
-                must_be_filled=must_be_filled == 1,
-                n_employees=n_employees,
+            self.__shifts_params.append(
+                dict(
+                    name=name,
+                    area=area,
+                    duration=duration,
+                    period=period,
+                    dates=dates,
+                    should_be_balanced=should_be_balanced,
+                    must_be_filled=must_be_filled,
+                    n_employees=n_employees,
+                )
             )
-        )
-        if area not in self.__areas:
-            self.__areas.append(area)
+            if area not in self.__areas:
+                self.__areas.append(area)
 
     # def add_employee(self, employee: Employee) -> None:
-    def add_employee(self, name: str, working_areas: list) -> None:
-        areas = [params["area"] for params in self.__shifts_params]
-        # assert all(area in areas for area in employee.areas)
-        message = (
-            "Employee area not registered on manager. \n\n"
-            + f"Available areas: {[area['name'] for area in self.shifts_params]} \n\n"
-            + f"Employee areas: {working_areas}"
-        )
-        assert all(area in areas for area in working_areas), message
-        employee = dict(name=[name], hours_worked=[0])
-        employee.update({area: [area in working_areas] for area in areas})
+    def add_employees(self) -> None:
+        for name in self.i["employees"]:
+            emp_areas = [
+                area for area, flag in self.i["employees_areas"][name].items() if flag
+            ]
+            # Also add sub areas
+            emp_areas = [area for area in self.areas if area.split("_")[0] in emp_areas]
+            message = (
+                "Employee area not registered on manager. \n\n"
+                + f"Available areas: {self.areas} \n\n"
+                + f"Employee areas: {emp_areas}"
+            )
+            assert all(area in self.areas for area in emp_areas), message
+            employee = dict(name=[name], hours_worked=[0])
+            employee.update({area: [area in emp_areas] for area in self.areas})
 
-        self.__employees = pd.concat(
-            [self.__employees, pd.DataFrame(employee)]
-        ).reset_index(drop=True)
+            self.__employees = pd.concat(
+                [self.__employees, pd.DataFrame(employee)]
+            ).reset_index(drop=True)
 
-    def add_constraints(self, constraints: pd.DataFrame):
-        self.__constraints = constraints
+    def add_constraints(self):
+        df = pd.DataFrame(self.i["restrictions"])
+        df[MAX_SHIFTS] = df[MAX_SHIFTS].astype(int)
+        self.__constraints = df
 
     def create_shifts(self) -> pd.DataFrame:
         start = pd.to_datetime(f"{self.__start_date}")
@@ -253,11 +282,13 @@ class Manager:
         n_shifts = n_shifts.fillna(0)
         n_shifts = n_shifts.astype(int)
 
-        employees = pd.merge(
+        employees_stats = pd.merge(
             self.employees[["name"]], n_shifts, left_index=True, right_index=True
         )
-        employees = pd.merge(employees, hours_worked, left_index=True, right_index=True)
-        self.__employees = employees
+        employees_stats = pd.merge(
+            employees_stats, hours_worked, left_index=True, right_index=True
+        )
+        self.stats = employees_stats
 
         self.drop_extra_shifts()
 
@@ -267,8 +298,8 @@ class Manager:
         # Create free weekends
         seed(1)
         shifts = self.shifts.copy()
-        employees = self.employees
-        employees["free_weekend"] = ""
+        stats = self.stats
+        stats["free_weekend"] = ""
         weekends_shifts = shifts.loc[shifts["is_weekend"]]
 
         # Only consider a weekend if there are at least 2 days
@@ -282,7 +313,7 @@ class Manager:
                 weeks.append(week)
 
         # Loop through employees
-        pool = employees.index[:-1]
+        pool = stats.index[:-1]
         counter = defaultdict(lambda: 0)
         while not pool.empty:
             i = choices(pool)[0]
@@ -294,8 +325,8 @@ class Manager:
                 pool = pool.drop(i)
                 continue
 
-            if counter[employees.loc[i, "name"]] > 50:
-                print(f"Could not find a free weekend for {employees.loc[i, 'name']}")
+            if counter[stats.loc[i, "name"]] > 50:
+                print(f"Could not find a free weekend for {stats.loc[i, 'name']}")
                 pool = pool.drop(i)
 
             sucessful_swaps = False
@@ -304,7 +335,7 @@ class Manager:
             while not sucessful_swaps:
                 # Try other employee if week pool is empty
                 if len(week_pool) == 0:
-                    counter[employees.loc[i, "name"]] += 1
+                    counter[stats.loc[i, "name"]] += 1
                     break
 
                 week = week_pool.pop()
@@ -332,7 +363,7 @@ class Manager:
                         (shifts["area"] == shift["area"]) & (shifts["employee_id"] != i)
                     ]["employee_id"].unique()
                     candidates = candidates[
-                        employees.loc[candidates]["free_weekend"] != week
+                        stats.loc[candidates]["free_weekend"] != week
                     ]
 
                     # If evening shift, dont consider people that are working on
@@ -411,7 +442,7 @@ class Manager:
                             )
                             & ~(
                                 shifts["is_weekend"]
-                                & (shifts["week"] == employees.loc[j, "free_weekend"])
+                                & (shifts["week"] == stats.loc[j, "free_weekend"])
                             )
                             & (shifts["date"] != shift["date"])
                         ]
@@ -457,26 +488,26 @@ class Manager:
                     sucessful_swaps = True
 
             if sucessful_swaps:
-                employees.loc[i, "free_weekend"] = week
-                print(f"Found free weekend for {employees.loc[i,'name']}")
+                stats.loc[i, "free_weekend"] = week
+                print(f"Found free weekend for {stats.loc[i,'name']}")
                 pool = pool.drop(i)
 
         weekends = shifts[shifts["is_weekend"]].groupby("week")["employee"].unique()
 
-        employees["free_weekend"] = ""
-        for i, employee in employees["name"].items():
+        stats["free_weekend"] = ""
+        for i, employee in stats["name"].items():
             for j, weekend in weekends.items():
                 if employee not in weekend:
-                    employees.loc[i, "free_weekend"] += f"{j} "
+                    stats.loc[i, "free_weekend"] += f"{j} "
 
-        self.__employees = employees
+        self.stats = stats
         self.__shifts = shifts
 
     def find_solution(self):
         self.create_shifts()
 
         # Initialize solutions and scores
-        solutions = self.create_solutions(self.__GA_params["n_solutions"])
+        solutions = self.create_solutions(self.__n_solutions)
         scores = self.calculate_scores(solutions)
 
         best = {}
@@ -723,7 +754,7 @@ class Manager:
             scores.append(-np.var(hours_worked))
         return np.array(scores)
 
-    def export_results(self, inputs_areas, month) -> None:
+    def export_results(self) -> None:
         shifts = self.shifts.copy()
         employees = self.employees
         shifts["sort_key"] = shifts["period"].map({"M": 0, "E": 1, "A": 2})
@@ -766,18 +797,17 @@ class Manager:
             columns=["SEMANA", "PERIODO", "AREA", "DIA DA SEMANA", "i", "RESIDENTE"],
         )
 
-        df.head(10)
         df = df.pivot(
             index=["SEMANA", "PERIODO", "AREA", "i"],
             columns="DIA DA SEMANA",
             values="RESIDENTE",
         )
         df.columns = df.columns.map(
-            {0: "SEG", 1: "TER", 2: "QUA", 3: "QUI", 4: "SEX", 5: "SAB", 6: "DOM"}
+            dict(zip(range(7), DAYS_OF_WEEK))
+            # {0: "SEG", 1: "TER", 2: "QUA", 3: "QUI", 4: "SEX", 5: "SAB", 6: "DOM"}
         )
         df.index = df.index.set_levels(["MANHA", "TARDE", "NOITE"], level=1)
         df = df.fillna("-")
-        df
 
         # People that are working in only one area
         one_area_person = employees[employees.select_dtypes(bool).sum(axis=1) == 1]
@@ -785,11 +815,11 @@ class Manager:
         one_area_person = one_area_person[one_area_person].index
         df = df.drop(level="AREA", index=one_area_person)
 
-        # Areas that have only one person and must be filled
+        # Areas that have only one person and must not be filled
         one_person_area = employees.select_dtypes(bool).sum()
         one_person_area = one_person_area[one_person_area == 1].index
-        must_not_be_filled = inputs_areas[inputs_areas["Obrigatório"] != 1]["Área"]
-        one_person_area = one_person_area[~one_person_area.isin(must_not_be_filled)]
+        not_mandatory = [p[AREA] for p in self.i["shifts"] if p[MANDATORY] != YES]
+        one_person_area = one_person_area[~one_person_area.isin(not_mandatory)]
         df = df.drop(level="AREA", index=one_person_area)
 
         def format_sheet(sheet, df):
@@ -816,7 +846,7 @@ class Manager:
             sheet.set_column("D:D", None, None, {"hidden": True})
             sheet.set_column("L:XFD", None, None, {"hidden": True})
 
-        with pd.ExcelWriter(f"escala_{month}.xlsx") as writer:
+        with pd.ExcelWriter(f"{OUTPUT_SHIFTS_NAME}_{self.i['month']}.xlsx") as writer:
             df.to_excel(writer, sheet_name="Escala", index=True)
             format_sheet(writer.sheets["Escala"], df)
 
@@ -834,15 +864,19 @@ class Manager:
                 df_.to_excel(writer, sheet_name=name, index=True)
                 format_sheet(writer.sheets[name], df_)
 
+        self.stats.sort_values("hours_worked").to_csv(
+            f"{OUTPUT_STATS_NAME}_{self.i['month']}.csv"
+        )
+
     def drop_extra_shifts(self):
         constraints = self.__constraints
-        self.__employees.loc[self.n_employees] = 0
-        self.__employees.loc[self.n_employees - 1, "name"] = "R+"
+        self.stats.loc[self.n_employees] = 0
+        self.stats.loc[self.n_employees, "name"] = "R+"
 
         for _, constraint in constraints.iterrows():
             area = constraint["Área"]
-            max_shifts = constraint["MaxTurnos"]
-            employees = self.employees[self.employees[area] > max_shifts]
+            max_shifts = constraint[MAX_SHIFTS]
+            employees = self.stats[self.stats[area] > max_shifts]
             n_extra = employees[area] - max_shifts
             for i, n in n_extra.items():
                 shifts = self.shifts[
@@ -861,14 +895,14 @@ class Manager:
                 i_exclude = indexes[: int(n)]
                 self.__shifts.loc[i_exclude, ["employee", "employee_id"]] = [
                     "R+",
-                    self.n_employees - 1,
+                    self.n_employees,
                 ]
 
-                self.__employees.loc[i, "hours_worked"] -= shifts.loc[i_exclude][
+                self.stats.loc[i, "hours_worked"] -= shifts.loc[i_exclude][
                     "duration"
                 ].sum()
-                self.__employees.loc[i, area] -= n
-                self.__employees.loc[self.n_employees - 1, area] += n
-                self.__employees.loc[
-                    self.n_employees - 1, "hours_worked"
-                ] += shifts.loc[i_exclude]["duration"].sum()
+                self.stats.loc[i, area] -= n
+                self.stats.loc[self.n_employees, area] += n
+                self.stats.loc[self.n_employees, "hours_worked"] += shifts.loc[
+                    i_exclude
+                ]["duration"].sum()

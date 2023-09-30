@@ -3,22 +3,22 @@
     "employees_areas": {
         "Henrique": {
             "Plantao": true,
-            "Puerperio": true,
+            "Puerperio": false,
             "Gineco": true,
-            "AltoRisco": true,
-            "Ambulatorio": false,
-            "SalaParto": false,
-            "Permanencia": false,
-            "Evolucao": false,
-            "BaixoRisco": false
-        },
-        "Jessika": {
-            "Plantao": true,
-            "Puerperio": true,
-            "Gineco": false,
             "AltoRisco": false,
             "Ambulatorio": false,
             "SalaParto": false,
+            "Permanencia": true,
+            "Evolucao": true,
+            "BaixoRisco": false
+        },
+        "Jessika": {
+            "Plantao": false,
+            "Puerperio": false,
+            "Gineco": false,
+            "AltoRisco": false,
+            "Ambulatorio": false,
+            "SalaParto": true,
             "Permanencia": false,
             "Evolucao": false,
             "BaixoRisco": false
@@ -28,7 +28,7 @@
             "Puerperio": false,
             "Gineco": false,
             "AltoRisco": false,
-            "Ambulatorio": false,
+            "Ambulatorio": true,
             "SalaParto": false,
             "Permanencia": false,
             "Evolucao": false,
@@ -36,57 +36,57 @@
         },
         "Rafaela": {
             "Plantao": true,
-            "Puerperio": false,
+            "Puerperio": true,
             "Gineco": false,
             "AltoRisco": false,
             "Ambulatorio": false,
             "SalaParto": false,
-            "Permanencia": false,
-            "Evolucao": false,
+            "Permanencia": true,
+            "Evolucao": true,
             "BaixoRisco": false
         },
         "Giovanna": {
-            "Plantao": false,
-            "Puerperio": false,
-            "Gineco": false,
-            "AltoRisco": false,
-            "Ambulatorio": false,
-            "SalaParto": false,
-            "Permanencia": false,
-            "Evolucao": false,
-            "BaixoRisco": false
-        },
-        "Ana Luiza": {
-            "Plantao": false,
+            "Plantao": true,
             "Puerperio": false,
             "Gineco": true,
             "AltoRisco": false,
             "Ambulatorio": false,
             "SalaParto": false,
-            "Permanencia": false,
-            "Evolucao": false,
+            "Permanencia": true,
+            "Evolucao": true,
+            "BaixoRisco": false
+        },
+        "Ana Luiza": {
+            "Plantao": true,
+            "Puerperio": false,
+            "Gineco": false,
+            "AltoRisco": true,
+            "Ambulatorio": false,
+            "SalaParto": false,
+            "Permanencia": true,
+            "Evolucao": true,
             "BaixoRisco": false
         },
         "Joyce": {
-            "Plantao": false,
-            "Puerperio": false,
+            "Plantao": true,
+            "Puerperio": true,
             "Gineco": false,
             "AltoRisco": false,
             "Ambulatorio": false,
             "SalaParto": false,
-            "Permanencia": false,
-            "Evolucao": false,
+            "Permanencia": true,
+            "Evolucao": true,
             "BaixoRisco": false
         },
         "Lilian": {
-            "Plantao": false,
-            "Puerperio": false,
+            "Plantao": true,
+            "Puerperio": true,
             "Gineco": false,
             "AltoRisco": false,
             "Ambulatorio": false,
             "SalaParto": false,
-            "Permanencia": false,
-            "Evolucao": false,
+            "Permanencia": true,
+            "Evolucao": true,
             "BaixoRisco": false
         },
         "Vitoria": {
@@ -98,7 +98,7 @@
             "SalaParto": false,
             "Permanencia": false,
             "Evolucao": false,
-            "BaixoRisco": false
+            "BaixoRisco": true
         },
         "Duda": {
             "Plantao": false,
@@ -106,31 +106,31 @@
             "Gineco": false,
             "AltoRisco": false,
             "Ambulatorio": false,
-            "SalaParto": false,
+            "SalaParto": true,
             "Permanencia": false,
             "Evolucao": false,
             "BaixoRisco": false
         },
         "Iara": {
-            "Plantao": false,
+            "Plantao": true,
             "Puerperio": false,
-            "Gineco": false,
+            "Gineco": true,
             "AltoRisco": false,
             "Ambulatorio": false,
             "SalaParto": false,
-            "Permanencia": false,
-            "Evolucao": false,
+            "Permanencia": true,
+            "Evolucao": true,
             "BaixoRisco": false
         },
         "Marcela": {
-            "Plantao": false,
+            "Plantao": true,
             "Puerperio": false,
-            "Gineco": false,
+            "Gineco": true,
             "AltoRisco": false,
             "Ambulatorio": false,
             "SalaParto": false,
-            "Permanencia": false,
-            "Evolucao": false,
+            "Permanencia": true,
+            "Evolucao": true,
             "BaixoRisco": false
         },
         "Camila": {
@@ -142,7 +142,7 @@
             "SalaParto": false,
             "Permanencia": false,
             "Evolucao": false,
-            "BaixoRisco": false
+            "BaixoRisco": true
         }
     },
     "areas": [
@@ -201,11 +201,33 @@
             "Per\u00edodo": "Manh\u00e3",
             "\u00c1rea": "Plantao",
             "Qtd. Pessoas": "2",
-            "Dias": "Seg, Ter, Qua, Qui, Sex, S\u00e1b, Dom",
+            "Dias": "S\u00e1b, Dom",
             "Obrigat\u00f3rio": "Sim",
             "Balancear": "Sim",
             "Dura\u00e7\u00e3o": "12.0",
             "Exce\u00e7\u00f5es": ""
+        },
+        {
+            "Nome": "Puerperio_Manha_Ambulatorio",
+            "Per\u00edodo": "Manh\u00e3",
+            "\u00c1rea": "Puerperio_Ambulatorio",
+            "Qtd. Pessoas": "1",
+            "Dias": "Ter, Qui, Sex",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "Sim",
+            "Dura\u00e7\u00e3o": "8.0",
+            "Exce\u00e7\u00f5es": "12/10/2023"
+        },
+        {
+            "Nome": "Puerperio_Manha2",
+            "Per\u00edodo": "Manh\u00e3",
+            "\u00c1rea": "Puerperio",
+            "Qtd. Pessoas": "2",
+            "Dias": "Ter, Qui, Sex",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "",
+            "Dura\u00e7\u00e3o": "5.0",
+            "Exce\u00e7\u00f5es": "12/10/2023"
         },
         {
             "Nome": "Puerperio_Manha1",
@@ -217,13 +239,327 @@
             "Balancear": "",
             "Dura\u00e7\u00e3o": "5.0",
             "Exce\u00e7\u00f5es": "12/10/2023"
+        },
+        {
+            "Nome": "Gineco_Manha1",
+            "Per\u00edodo": "Manh\u00e3",
+            "\u00c1rea": "Gineco",
+            "Qtd. Pessoas": "2",
+            "Dias": "Seg, Qui",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "",
+            "Dura\u00e7\u00e3o": "5.0",
+            "Exce\u00e7\u00f5es": "12/10/2023"
+        },
+        {
+            "Nome": "Gineco_Manha2",
+            "Per\u00edodo": "Manh\u00e3",
+            "\u00c1rea": "Gineco",
+            "Qtd. Pessoas": "3",
+            "Dias": "Qua",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "",
+            "Dura\u00e7\u00e3o": "5.0",
+            "Exce\u00e7\u00f5es": "12/10/2023"
+        },
+        {
+            "Nome": "Gineco_Manha3",
+            "Per\u00edodo": "Manh\u00e3",
+            "\u00c1rea": "Gineco",
+            "Qtd. Pessoas": "4",
+            "Dias": "Sex",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "",
+            "Dura\u00e7\u00e3o": "5.0",
+            "Exce\u00e7\u00f5es": "12/10/2023"
+        },
+        {
+            "Nome": "Gineco_Manha_Cirurgia1",
+            "Per\u00edodo": "Manh\u00e3",
+            "\u00c1rea": "Gineco_Cirurgia",
+            "Qtd. Pessoas": "1",
+            "Dias": "Qua",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "Sim",
+            "Dura\u00e7\u00e3o": "9.0",
+            "Exce\u00e7\u00f5es": "12/10/2023"
+        },
+        {
+            "Nome": "Gineco_Manha_Cirurgia2",
+            "Per\u00edodo": "Manh\u00e3",
+            "\u00c1rea": "Gineco_Cirurgia",
+            "Qtd. Pessoas": "2",
+            "Dias": "Seg, Qui",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "Sim",
+            "Dura\u00e7\u00e3o": "9.0",
+            "Exce\u00e7\u00f5es": "12/10/2023"
+        },
+        {
+            "Nome": "Gineco_Manha_Cirurgia3",
+            "Per\u00edodo": "Manh\u00e3",
+            "\u00c1rea": "Gineco_Cirurgia",
+            "Qtd. Pessoas": "4",
+            "Dias": "Ter",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "Sim",
+            "Dura\u00e7\u00e3o": "9.0",
+            "Exce\u00e7\u00f5es": "12/10/2023"
+        },
+        {
+            "Nome": "Alto_Risco",
+            "Per\u00edodo": "Manh\u00e3",
+            "\u00c1rea": "AltoRisco",
+            "Qtd. Pessoas": "1",
+            "Dias": "Seg, Ter, Qua, Qui, Sex",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "",
+            "Dura\u00e7\u00e3o": "5.0",
+            "Exce\u00e7\u00f5es": "12/10/2023"
+        },
+        {
+            "Nome": "Ambulatorio_Manha",
+            "Per\u00edodo": "Manh\u00e3",
+            "\u00c1rea": "Ambulatorio",
+            "Qtd. Pessoas": "1",
+            "Dias": "Seg, Ter, Qua, Qui, Sex",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "",
+            "Dura\u00e7\u00e3o": "4.0",
+            "Exce\u00e7\u00f5es": "12/10/2023"
+        },
+        {
+            "Nome": "Ambulatorio_Tarde",
+            "Per\u00edodo": "Tarde",
+            "\u00c1rea": "Ambulatorio",
+            "Qtd. Pessoas": "1",
+            "Dias": "Seg, Ter, Qua, Qui, Sex",
+            "Obrigat\u00f3rio": "",
+            "Balancear": "",
+            "Dura\u00e7\u00e3o": "4.0",
+            "Exce\u00e7\u00f5es": "12/10/2023"
+        },
+        {
+            "Nome": "Sala_Parto",
+            "Per\u00edodo": "Manh\u00e3",
+            "\u00c1rea": "SalaParto",
+            "Qtd. Pessoas": "2",
+            "Dias": "Seg, Ter, Qua, Qui, Sex",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "",
+            "Dura\u00e7\u00e3o": "12.0",
+            "Exce\u00e7\u00f5es": ""
+        },
+        {
+            "Nome": "Permanencia2",
+            "Per\u00edodo": "Tarde",
+            "\u00c1rea": "Permanencia",
+            "Qtd. Pessoas": "2",
+            "Dias": "Seg, Qua, Qui, Sex",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "Sim",
+            "Dura\u00e7\u00e3o": "4.5",
+            "Exce\u00e7\u00f5es": "12/10/2023"
+        },
+        {
+            "Nome": "Permanencia3",
+            "Per\u00edodo": "Tarde",
+            "\u00c1rea": "Permanencia",
+            "Qtd. Pessoas": "3",
+            "Dias": "Ter",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "Sim",
+            "Dura\u00e7\u00e3o": "4.5",
+            "Exce\u00e7\u00f5es": "12/10/2023"
+        },
+        {
+            "Nome": "Evolucao",
+            "Per\u00edodo": "Manh\u00e3",
+            "\u00c1rea": "Evolucao",
+            "Qtd. Pessoas": "2",
+            "Dias": "S\u00e1b, Dom",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "Sim",
+            "Dura\u00e7\u00e3o": "5.0",
+            "Exce\u00e7\u00f5es": ""
+        },
+        {
+            "Nome": "BaixoRisco",
+            "Per\u00edodo": "Manh\u00e3",
+            "\u00c1rea": "BaixoRisco",
+            "Qtd. Pessoas": "2",
+            "Dias": "Seg, Ter, Qua, Qui, Sex",
+            "Obrigat\u00f3rio": "Sim",
+            "Balancear": "Sim",
+            "Dura\u00e7\u00e3o": "12.0",
+            "Exce\u00e7\u00f5es": ""
         }
     ],
     "timeoff": [
         {
-            "Nome": "Henrique",
-            "Data": "01/05/2023",
+            "Nome": "Giovanna",
+            "Data": "07/10/2023",
             "Per\u00edodo": "Manh\u00e3"
+        },
+        {
+            "Nome": "Giovanna",
+            "Data": "07/10/2023",
+            "Per\u00edodo": "Tarde"
+        },
+        {
+            "Nome": "Giovanna",
+            "Data": "07/10/2023",
+            "Per\u00edodo": "Noite"
+        },
+        {
+            "Nome": "Giovanna",
+            "Data": "08/10/2023",
+            "Per\u00edodo": "Manh\u00e3"
+        },
+        {
+            "Nome": "Joyce",
+            "Data": "01/10/2023",
+            "Per\u00edodo": "Manh\u00e3"
+        },
+        {
+            "Nome": "Joyce",
+            "Data": "01/10/2023",
+            "Per\u00edodo": "Tarde"
+        },
+        {
+            "Nome": "Joyce",
+            "Data": "01/10/2023",
+            "Per\u00edodo": "Noite"
+        },
+        {
+            "Nome": "Joyce",
+            "Data": "13/10/2023",
+            "Per\u00edodo": "Noite"
+        },
+        {
+            "Nome": "Joyce",
+            "Data": "14/10/2023",
+            "Per\u00edodo": "Manh\u00e3"
+        },
+        {
+            "Nome": "Joyce",
+            "Data": "14/10/2023",
+            "Per\u00edodo": "Tarde"
+        },
+        {
+            "Nome": "Joyce",
+            "Data": "14/10/2023",
+            "Per\u00edodo": "Noite"
+        },
+        {
+            "Nome": "Joyce",
+            "Data": "15/10/2023",
+            "Per\u00edodo": "Manh\u00e3"
+        },
+        {
+            "Nome": "Joyce",
+            "Data": "15/10/2023",
+            "Per\u00edodo": "Tarde"
+        },
+        {
+            "Nome": "Joyce",
+            "Data": "15/10/2023",
+            "Per\u00edodo": "Noite"
+        },
+        {
+            "Nome": "Lilian",
+            "Data": "01/10/2023",
+            "Per\u00edodo": "Manh\u00e3"
+        },
+        {
+            "Nome": "Lilian",
+            "Data": "01/10/2023",
+            "Per\u00edodo": "Tarde"
+        },
+        {
+            "Nome": "Lilian",
+            "Data": "01/10/2023",
+            "Per\u00edodo": "Noite"
+        },
+        {
+            "Nome": "Lilian",
+            "Data": "27/10/2023",
+            "Per\u00edodo": "Noite"
+        },
+        {
+            "Nome": "Lilian",
+            "Data": "28/10/2023",
+            "Per\u00edodo": "Manh\u00e3"
+        },
+        {
+            "Nome": "Lilian",
+            "Data": "28/10/2023",
+            "Per\u00edodo": "Tarde"
+        },
+        {
+            "Nome": "Lilian",
+            "Data": "28/10/2023",
+            "Per\u00edodo": "Noite"
+        },
+        {
+            "Nome": "Lilian",
+            "Data": "29/10/2023",
+            "Per\u00edodo": "Manh\u00e3"
+        },
+        {
+            "Nome": "Lilian",
+            "Data": "29/10/2023",
+            "Per\u00edodo": "Tarde"
+        },
+        {
+            "Nome": "Lilian",
+            "Data": "29/10/2023",
+            "Per\u00edodo": "Noite"
+        },
+        {
+            "Nome": "Iara",
+            "Data": "13/10/2023",
+            "Per\u00edodo": "Noite"
+        },
+        {
+            "Nome": "Iara",
+            "Data": "14/10/2023",
+            "Per\u00edodo": "Manh\u00e3"
+        },
+        {
+            "Nome": "Iara",
+            "Data": "14/10/2023",
+            "Per\u00edodo": "Tarde"
+        },
+        {
+            "Nome": "Iara",
+            "Data": "14/10/2023",
+            "Per\u00edodo": "Noite"
+        },
+        {
+            "Nome": "Iara",
+            "Data": "15/10/2023",
+            "Per\u00edodo": "Manh\u00e3"
+        },
+        {
+            "Nome": "Iara",
+            "Data": "15/10/2023",
+            "Per\u00edodo": "Tarde"
+        },
+        {
+            "Nome": "Iara",
+            "Data": "15/10/2023",
+            "Per\u00edodo": "Noite"
+        },
+        {
+            "Nome": "Iara",
+            "Data": "11/10/2023",
+            "Per\u00edodo": "Tarde"
+        },
+        {
+            "Nome": "Marcela",
+            "Data": "11/10/2023",
+            "Per\u00edodo": "Tarde"
         }
     ],
     "restrictions": [
