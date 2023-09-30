@@ -2,10 +2,10 @@
     "month": "Out",
     "employees_areas": {
         "Henrique": {
-            "Plantao": false,
-            "Puerperio": false,
-            "Gineco": false,
-            "AltoRisco": false,
+            "Plantao": true,
+            "Puerperio": true,
+            "Gineco": true,
+            "AltoRisco": true,
             "Ambulatorio": false,
             "SalaParto": false,
             "Permanencia": false,
@@ -231,5 +231,6 @@
             "\u00c1rea": "Plantao",
             "Qtd. M\u00e1xima de Turnos": "8"
         }
-    ]
+    ],
+    "year": 2023
 }

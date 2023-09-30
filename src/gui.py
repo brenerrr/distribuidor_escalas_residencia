@@ -1,5 +1,5 @@
 from PyQt5 import uic
-from PyQt5.QtCore import Qt, QEvent, QDate
+from PyQt5.QtCore import Qt, QEvent, QDate, QCoreApplication
 from PyQt5.QtWidgets import (
     QMainWindow,
     QGridLayout,
@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import (
     QTextEdit,
     QDateEdit,
     QApplication,
+    QSpinBox,
 )
 from datetime import datetime
 import sys
@@ -29,9 +30,9 @@ class Ui(QMainWindow):
         super(Ui, self).__init__()  # Call the inherited classes __init__ method
         uic.loadUi("src\\manager.ui", self)  # Load the .ui file
 
-        self.initialize_variables()
-        self.startup_values = defaultdict(lambda: {})
+        self.startup_values = defaultdict(lambda: defaultdict(lambda: {}))
         self.startup_values.update(startup_values)
+        self.initialize_variables()
         self.populate_widgets_startup()
         self.setup_signals()
         self.format_tables_columns(
@@ -45,15 +46,21 @@ class Ui(QMainWindow):
         )
 
     @property
+    def all_areas(self):
+        return self.read_table(self.table_areas)[0].values
+
+    @property
     def areas(self):
-        return self.read_table(self.table_areas)[0]
+        areas = self.read_table(self.table_areas)[0]
+        return areas.str.split("_").str[0].unique()
 
     @property
     def employees(self):
         return self.read_table(self.table_employees)[0]
 
     def initialize_variables(self):
-        self.employees_areas = None
+        self.employees_areas = {}
+        self.employees_areas.update(self.startup_values["employees_areas"])
         self.selected_dates = defaultdict(lambda: list())
         self.header_shifts = [
             "Nome",
@@ -68,6 +75,8 @@ class Ui(QMainWindow):
         ]
         self.header_timeoff = ["Nome", "Data", "Período"]
         self.header_restrictions = ["Área", "Qtd. Máxima de Turnos"]
+        self.checks_emp_areas = {}
+        self.widgets_emp_areas = []
 
     def read_table(self, table):
         n_rows = table.rowCount()
@@ -80,38 +89,49 @@ class Ui(QMainWindow):
     ):
         layout: QGridLayout = self.grid_employees_areas
 
-        areas = self.areas.str.split("_").str[0].unique()
-        employees = self.employees.values
+        areas = self.areas
+        employees = self.employees
+
+        # Clean previously created widgets
+        for i in range(len(self.widgets_emp_areas)):
+            widget = self.widgets_emp_areas.pop()
+            widget.deleteLater()
 
         for i, area in enumerate(areas):
-            layout.addWidget(QLabel(area), i + 1, 0)
+            label = QLabel(area)
+            layout.addWidget(label, i + 1, 0)
+            self.widgets_emp_areas.append(label)
 
         for j, employee in enumerate(employees):
-            layout.addWidget(QLabel(employee), 0, j + 1)
+            label = QLabel(employee)
+            layout.addWidget(label, 0, j + 1)
+            self.widgets_emp_areas.append(label)
 
-        checks = defaultdict(lambda: dict())
+        checks = defaultdict(lambda: defaultdict())
         for i, area in enumerate(areas):
             layout.setRowStretch(i, 1)
             for j, employee in enumerate(employees):
                 check = QCheckBox()
                 check.setStyleSheet("QCheckBox::indicator{width: 20px; height: 20px;};")
-                value = (
-                    self.startup_values.get("employees_areas", {})
-                    .get(employee, {})
-                    .get(area)
-                )
-                if value:
-                    check.setChecked(value)
+                value = self.employees_areas.get(employee, {}).get(area, False)
+                check.setChecked(value)
+                self.widgets_emp_areas.append(check)
+                checks[employee][area] = check
 
                 layout.addWidget(check, i + 1, j + 1)
                 layout.setColumnStretch(j, 1)
                 layout.setAlignment(check, Qt.AlignCenter)
+                check.stateChanged.connect(self.update_tab_areas_employees)
                 check.stateChanged.connect(self.export_startup_values)
-                checks[employee][area] = check
 
-        self.employees_areas = checks
+        self.checks_emp_areas = checks
 
-        pass
+    def update_tab_areas_employees(self):
+        d = defaultdict(lambda: {})
+        for e in self.employees:
+            for a in self.areas:
+                d[e][a] = self.checks_emp_areas[e][a].isChecked()
+        self.employees_areas = d
 
     def format_tables_columns(self, tables):
         for table in tables:
@@ -131,8 +151,8 @@ class Ui(QMainWindow):
         def tab_fn(index):
             d = {
                 0: lambda: None,
-                1: self.create_tab_areas_employees,
-                2: self.populate_tab_shifts_widgets,
+                1: self.update_tab_areas_employees,
+                2: lambda: None,
                 3: lambda: None,
             }
             fn = d.get(index)
@@ -165,6 +185,15 @@ class Ui(QMainWindow):
 
         self.table_employees.itemChanged.connect(self.update_dropEmp)
         self.table_areas.itemChanged.connect(self.update_dropAreas)
+        self.table_areas.itemChanged.connect(self.create_tab_areas_employees)
+        self.table_employees.itemChanged.connect(self.create_tab_areas_employees)
+
+        self.table_areas.doubleClicked.connect(self.update_dropAreas)
+        self.table_areas.doubleClicked.connect(self.create_tab_areas_employees)
+        self.table_employees.doubleClicked.connect(self.update_dropEmp)
+        self.table_employees.doubleClicked.connect(self.create_tab_areas_employees)
+
+        self.sb_year.valueChanged.connect(self.export_startup_values)
 
     def assign_table_signals(self, table: QTableWidget):
         table.doubleClicked.connect(self.remove_area)
@@ -268,13 +297,20 @@ class Ui(QMainWindow):
         self.update_dropEmp()
         self.update_dropAreas()
 
+        year = (
+            self.startup_values["year"]
+            if isinstance(self.startup_values["year"], int)
+            else datetime.now().year
+        )
+        self.sb_year.setValue(year)
+
     def update_dropEmp(self):
         for comboBox in [self.drop_timeoffEmp]:
             comboBox.addItems(self.employees)
 
     def update_dropAreas(self):
         for comboBox in [self.drop_restrictionArea, self.drop_shiftArea]:
-            comboBox.addItems(self.areas)
+            comboBox.addItems(self.all_areas)
 
     def add_items(self, table: QTableWidget, rows: list):
         for row in rows:
@@ -323,14 +359,11 @@ class Ui(QMainWindow):
         export_dict["month"] = comboBox.currentText()
 
         # Checks that relates employees and areas
-        if self.employees_areas is not None:
-            d = defaultdict(lambda: dict())
-            for employee, checks in self.employees_areas.items():
-                for area, check in checks.items():
-                    d[employee][area] = check.isChecked()
-            export_dict["employees_areas"] = d
-        elif self.startup_values.get("employee_areas") is not None:
-            export_dict["employees_areas"] = self.startup_values["employees_areas"]
+        d = defaultdict(lambda: dict())
+        for e in self.employees:
+            for a in self.areas:
+                d[e][a] = self.employees_areas.get(e, {}).get(a, False)
+        export_dict["employees_areas"] = d
 
         # Tables
         export_dict["areas"] = self.get_table_data(self.table_areas)
@@ -339,7 +372,9 @@ class Ui(QMainWindow):
         export_dict["timeoff"] = self.get_table_data(self.table_timeoff)
         export_dict["restrictions"] = self.get_table_data(self.table_restrictions)
 
-        with open("startup.json", "w") as f:
+        export_dict["year"] = self.sb_year.value()
+
+        with open("inputs.json", "w") as f:
             json_object = json.dumps(export_dict, indent=4)
             f.write(json_object)
 
@@ -365,10 +400,6 @@ class Ui(QMainWindow):
         if len(headers) == 1:
             data = [value[headers[0]] for value in data]
         return data
-
-    def populate_tab_shifts_widgets(self):
-        self.drop_shiftArea.addItems(self.areas.values)
-        pass
 
     def add_shift(self):
         data = {}
@@ -421,10 +452,11 @@ class Ui(QMainWindow):
         return string
 
 
-with open("startup.json", "r") as f:
-    startup_values = json.load(f)
+if __name__ == "__main__":
+    with open("inputs.json", "r") as f:
+        startup_values = json.load(f)
 
-app = QApplication(sys.argv)  # Create an instance of Application
-window = Ui(startup_values)  # Create an instance of our class
-window.show()
-app.exec()  # Start the application
+    app = QApplication(sys.argv)  # Create an instance of Application
+    window = Ui(startup_values)  # Create an instance of our class
+    window.show()
+    app.exec()  # Start the application
