@@ -224,7 +224,7 @@ class Manager:
             shift_interval = pd.Interval(shift_start, shift_end)
             i_timeoff = [
                 i
-                for i, interval in self.timeoff.items()
+                for i, interval in timeoff.items()
                 if shift_interval.overlaps(interval)
             ]
             if len(i_timeoff) > 0:
@@ -440,7 +440,7 @@ class Manager:
                     # Try to switch shifts with candidates
                     swap = []
                     for j in candidates:
-                        # List all shifts of the same kind of this candidate that are on other weekends
+                        # List all shifts of the same kind for this candidate that are not on this weekend or on their free weekend
                         shifts_swap = shifts[
                             (shifts["employee_id"] == j)
                             & (shifts["area"] == shift["area"])

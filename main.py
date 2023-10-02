@@ -6,4 +6,4 @@ import json
 
 manager = Manager("inputs.json")
 manager.create_schedule()
-manager.export_results()
+manager.export_results(".")
