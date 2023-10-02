@@ -9,7 +9,6 @@ from manager import Manager
 
 class WorkerThread(QThread):
     finished = pyqtSignal()
-    progress = pyqtSignal(int)
     status = pyqtSignal(str)
     error = pyqtSignal(int)
 
@@ -31,10 +30,11 @@ class WorkerThread(QThread):
             best = dict(score=scores[i], solution=solutions.loc[:, i])
             self.status.emit("Encontrando fins de semana de folga para todos...")
             manager.create_schedule(best)
-            self.progress.emit(1)
+            manager.export_results(os.path.dirname(sys.argv[0]))
+            self.error.emit(1)
             self.finished.emit()
         except RuntimeError as e:
-            self.progress.emit(-1)
+            self.error.emit(-1)
             self.finished.emit()
 
     def check_interruptions(self):

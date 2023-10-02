@@ -604,66 +604,6 @@ class Manager:
             solutions.loc[:, j] = self.create_solution()
         return solutions
 
-        # # Loop through shifts
-        # i = 0
-        # while i < shifts.shape[0]:
-        #     shift = shifts.iloc[i]
-
-        #     # # Do not consider shifts without solutions
-        #     ii = solutions.loc[: i - 1, j] >= 0
-        #     next_shifts = shifts.loc[: i - 1]
-        #     solution = solutions.loc[: i - 1, j]
-        #     next_shifts = next_shifts[ii].reset_index(drop=True)
-        #     solution = solution[ii].reset_index(drop=True)
-
-        #     cost_matrix = self.calculate_costs(
-        #         shift,
-        #         solution,
-        #         next_shifts,
-        #     )
-
-        #     # If there are no eligible employees, start again
-        #     if (cost_matrix >= LARGE_NUMBER).all():
-        #         print(f"Trying generating another initial solution {i} {j}")
-        #         print(shift["name"])
-        #         c += 1
-        #         i = next_shifts[
-        #             next_shifts["date"].dt.day == (shift["date"].day - 7)
-        #         ]
-        #         i = 0 if i.empty else i.index[0]
-        #         continue
-        #     else:
-        #         # The eligible employees with the most amount of hours worked
-        #         # will not be considered
-        #         mask = cost_matrix < LARGE_NUMBER
-        #         if (cost_matrix[mask].min() == cost_matrix[mask]).sum() > 1:
-        #             solutions.loc[i, j] = choices(
-        #                 cost_matrix[cost_matrix == cost_matrix.min()].index
-        #             )[0]
-        #         else:
-        #             solutions.loc[i, j] = np.argmin(cost_matrix)
-
-        #     # Find optional shifts that should not be worked
-        #     next_shifts_all = shifts.iloc[:i] if i > 0 else pd.DataFrame()
-        #     if shift["period"] == EVENING and not next_shifts_all.empty:
-        #         optional = next_shifts_all[
-        #             (next_shifts_all["date"].dt.day == (shift["date"].day + 1))
-        #             & (
-        #                 (next_shifts_all["period"] == AFTERNOON)
-        #                 | (next_shifts_all["period"] == EVENING)
-        #             )
-        #             & (~next_shifts_all["must_be_filled"])
-        #         ]
-        #         if not optional.empty:
-        #             employee = solutions.loc[i, j]
-        #             for ii, _ in optional.iterrows():
-        #                 optional_employee = solutions.loc[ii, j]
-        #                 if optional_employee == employee:
-        #                     solutions.loc[ii, j] = -1
-
-        #     i += 1
-        # return solutions.loc[::-1, :].reset_index(drop=True)
-
     def calculate_costs(
         self,
         shift: pd.DataFrame,
@@ -818,7 +758,7 @@ class Manager:
             scores.append(-np.var(hours_worked))
         return np.array(scores)
 
-    def export_results(self) -> None:
+    def export_results(self, path: str) -> None:
         shifts = self.shifts.copy()
         employees = self.employees
         shifts["sort_key"] = shifts["period"].map({"M": 0, "E": 1, "A": 2})
@@ -910,7 +850,8 @@ class Manager:
             sheet.set_column("D:D", None, None, {"hidden": True})
             sheet.set_column("L:XFD", None, None, {"hidden": True})
 
-        with pd.ExcelWriter(f"{OUTPUT_SHIFTS_NAME}_{self.i['month']}.xlsx") as writer:
+        file = f"{OUTPUT_SHIFTS_NAME}_{self.i['month']}.xlsx"
+        with pd.ExcelWriter(os.path.join(path, file)) as writer:
             df.to_excel(writer, sheet_name="Escala", index=True)
             format_sheet(writer.sheets["Escala"], df)
 
@@ -928,9 +869,8 @@ class Manager:
                 df_.to_excel(writer, sheet_name=name, index=True)
                 format_sheet(writer.sheets[name], df_)
 
-        self.stats.sort_values("hours_worked").to_csv(
-            f"{OUTPUT_STATS_NAME}_{self.i['month']}.csv"
-        )
+        file = f"{OUTPUT_STATS_NAME}_{self.i['month']}.csv"
+        self.stats.sort_values("hours_worked").to_csv(os.path.join(path, file))
 
     def drop_extra_shifts(self):
         constraints = self.__constraints

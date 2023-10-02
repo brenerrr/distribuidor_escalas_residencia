@@ -2,8 +2,12 @@ import sys
 import os
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+if sys.version_info[0:2] != (3, 10):
+    raise Exception("Requires python 3.10")
 
-from PyQt5 import uic, QtGui
+
+folderpath = os.path.dirname(sys.argv[0])
+
 from PyQt5.QtCore import Qt, QEvent, QDate
 
 from PyQt5.QtWidgets import (
@@ -28,11 +32,10 @@ import json
 from collections import defaultdict
 import pandas as pd
 import os
-from manager import Manager
-from waiting_spinner import QtWaitingSpinner
-from worker_thread import WorkerThread
-from main_window import MainWindow
-from status_window import StatusWindow
+from src.waiting_spinner import QtWaitingSpinner
+from src.worker_thread import WorkerThread
+from src.main_window import MainWindow
+from src.status_window import StatusWindow
 
 os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
 
@@ -69,16 +72,27 @@ class App(QApplication):
 
     @property
     def all_areas(self):
-        return self.read_table(self.main.table_areas)[0].values
+        areas = self.read_table(self.main.table_areas)
+        if areas.empty:
+            return []
+        else:
+            return areas[0].values
 
     @property
     def areas(self):
-        areas = self.read_table(self.main.table_areas)[0]
-        return areas.str.split("_").str[0].unique()
+        areas = self.read_table(self.main.table_areas)
+        if areas.empty:
+            return []
+        else:
+            return areas[0].str.split("_").str[0].unique()
 
     @property
     def employees(self):
-        return self.read_table(self.main.table_employees)[0]
+        employees = self.read_table(self.main.table_employees)
+        if employees.empty:
+            return []
+        else:
+            return employees[0]
 
     def initialize_variables(self):
         self.employees_areas = {}
@@ -412,9 +426,7 @@ class App(QApplication):
 
         export_dict["year"] = self.main.sb_year.value()
 
-        path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "../inputs.json"
-        )
+        path = os.path.join(folderpath, "inputs.json")
         with open(path, "w") as f:
             json_object = json.dumps(export_dict, indent=4)
             f.write(json_object)
@@ -498,9 +510,8 @@ class App(QApplication):
             self.w_thread = WorkerThread()
 
             self.w_thread.finished.connect(self.finish_worker_thread)
-            self.w_thread.progress.connect(self.update_progress)
-            self.w_thread.error.connect(self.update_progress)
-            self.w_thread.status.connect(self.update_status)
+            self.w_thread.error.connect(self.create_popup)
+            self.w_thread.status.connect(self.update_label)
 
             self.w_thread.start()
             self.started_worker_thread = True
@@ -516,7 +527,7 @@ class App(QApplication):
         self.progress.prevent_closing()
         print("finished_worker_thread")
 
-    def update_progress(self, n: int):
+    def create_popup(self, n: int):
         if n == -1:
             self.error.setText(
                 "Não foi possível achar uma solução com os inputs fornecidos"
@@ -528,15 +539,20 @@ class App(QApplication):
             self.success.show()
             self.progress.close()
 
-    def update_status(self, s: str):
+    def update_label(self, s: str):
         self.progress.label.setText(s)
 
 
 if __name__ == "__main__":
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../inputs.json")
-
-    with open(path, "r") as f:
-        startup_values = json.load(f)
+    path = os.path.join(folderpath, "inputs.json")
+    try:
+        with open(path, "r") as f:
+            startup_values = json.load(f)
+    except FileNotFoundError:
+        startup_values = {}
 
     app = App(sys.argv, startup_values)
     app.exec()  # Start the application
+
+
+# pyinstaller --name=app --windowed --onefile --paths .\src\ --add-data ".\src\main_window.ui;.\src\" --add-data ".\src\status_window.ui;.\src\"  app.py
