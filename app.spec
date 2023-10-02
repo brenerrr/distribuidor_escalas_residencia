@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['app.py'],
+    ['main.py'],
     pathex=['.\\src\\'],
     binaries=[],
     datas=[('.\\src\\main_window.ui', '.\\src\\'), ('.\\src\\status_window.ui', '.\\src\\')],
@@ -34,4 +34,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    windowed=False
 )

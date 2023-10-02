@@ -14,10 +14,9 @@ class StatusWindow(QWidget):
             StatusWindow, self
         ).__init__()  # Call the inherited classes __init__ method
         if getattr(sys, "frozen", False):
-            filepath = sys._MEIPASS
+            filepath = os.path.join(sys._MEIPASS, "./src/")
         else:
             filepath = os.path.dirname(os.path.abspath(__file__))
-        filepath = os.path.dirname(os.path.abspath(__file__))
         fullpath = os.path.join(filepath, "status_window.ui")
         uic.loadUi(fullpath, self)  # Load the .ui file
         self.setWindowFlag(Qt.FramelessWindowHint, True)
