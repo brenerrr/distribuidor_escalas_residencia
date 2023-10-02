@@ -2,11 +2,7 @@ import sys
 import os
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-if sys.version_info[0:2] != (3, 10):
-    raise Exception("Requires python 3.10")
 
-
-folderpath = os.path.dirname(sys.argv[0])
 
 from PyQt5.QtCore import Qt, QEvent, QDate
 
@@ -32,18 +28,19 @@ import json
 from collections import defaultdict
 import pandas as pd
 import os
-from src.waiting_spinner import QtWaitingSpinner
-from src.worker_thread import WorkerThread
-from src.main_window import MainWindow
-from src.status_window import StatusWindow
+from waiting_spinner import QtWaitingSpinner
+from worker_thread import WorkerThread
+from main_window import MainWindow
+from status_window import StatusWindow
 
 os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
 
 
 class App(QApplication):
-    def __init__(self, args, startup_values: defaultdict):
+    def __init__(self, args, inputs_path: str):
         super(App, self).__init__(args)  # Call the inherited classes __init__ method
 
+        self.read_inputs(inputs_path)
         self.main = MainWindow()
         self.progress = StatusWindow()
         self.progress.waitingSpinner = QtWaitingSpinner(self.progress, False)
@@ -55,8 +52,6 @@ class App(QApplication):
         self.setup_success_window()
         self.main.show()
 
-        self.startup_values = defaultdict(lambda: defaultdict(lambda: {}))
-        self.startup_values.update(startup_values)
         self.initialize_variables()
         self.populate_widgets_startup()
         self.setup_signals()
@@ -94,9 +89,20 @@ class App(QApplication):
         else:
             return employees[0]
 
+    def read_inputs(self, inputs_path: str):
+        try:
+            with open(inputs_path, "r") as f:
+                startup_values = json.load(f)
+        except FileNotFoundError:
+            startup_values = {}
+
+        self.inputs = defaultdict(lambda: defaultdict(lambda: {}))
+        self.inputs.update(startup_values)
+        self.inputs_path = inputs_path
+
     def initialize_variables(self):
         self.employees_areas = {}
-        self.employees_areas.update(self.startup_values["employees_areas"])
+        self.employees_areas.update(self.inputs["employees_areas"])
         self.selected_dates = defaultdict(lambda: list())
         self.header_shifts = [
             "Nome",
@@ -277,28 +283,28 @@ class App(QApplication):
     def populate_widgets_startup(self):
         # Tables
         tables = dict(
-            areas=dict(values=self.startup_values["areas"], obj=self.main.table_areas),
+            areas=dict(values=self.inputs["areas"], obj=self.main.table_areas),
             employees=dict(
-                values=self.startup_values["employees"], obj=self.main.table_employees
+                values=self.inputs["employees"], obj=self.main.table_employees
             ),
             shifts=dict(
                 values=[
                     [shift[header] for header in self.header_shifts]
-                    for shift in self.startup_values["shifts"]
+                    for shift in self.inputs["shifts"]
                 ],
                 obj=self.main.table_shifts,
             ),
             timeoff=dict(
                 values=[
                     [row[header] for header in self.header_timeoff]
-                    for row in self.startup_values["timeoff"]
+                    for row in self.inputs["timeoff"]
                 ],
                 obj=self.main.table_timeoff,
             ),
             restrictions=dict(
                 values=[
                     [row[header] for header in self.header_restrictions]
-                    for row in self.startup_values["restrictions"]
+                    for row in self.inputs["restrictions"]
                 ],
                 obj=self.main.table_restrictions,
             ),
@@ -326,7 +332,7 @@ class App(QApplication):
         ]
 
         comboBox.addItems(months)
-        monthNow = self.startup_values.get("month", months[datetime.now().month - 1])
+        monthNow = self.inputs.get("month", months[datetime.now().month - 1])
         comboBox.setCurrentText(monthNow)
 
         # Date edits
@@ -351,8 +357,8 @@ class App(QApplication):
         self.update_dropAreas()
 
         year = (
-            self.startup_values["year"]
-            if isinstance(self.startup_values["year"], int)
+            self.inputs["year"]
+            if isinstance(self.inputs["year"], int)
             else datetime.now().year
         )
         self.main.sb_year.setValue(year)
@@ -428,7 +434,7 @@ class App(QApplication):
         export_dict["year"] = self.main.sb_year.value()
         export_dict["n_solutions"] = self.main.sb_nSolutions.value()
 
-        path = os.path.join(folderpath, "inputs.json")
+        path = os.path.join(self.inputs_path)
         with open(path, "w") as f:
             json_object = json.dumps(export_dict, indent=4)
             f.write(json_object)
@@ -543,18 +549,3 @@ class App(QApplication):
 
     def update_label(self, s: str):
         self.progress.label.setText(s)
-
-
-if __name__ == "__main__":
-    path = os.path.join(folderpath, "inputs.json")
-    try:
-        with open(path, "r") as f:
-            startup_values = json.load(f)
-    except FileNotFoundError:
-        startup_values = {}
-
-    app = App(sys.argv, startup_values)
-    app.exec()  # Start the application
-
-
-# pyinstaller --name=app --windowed --onefile --paths .\src\ --add-data ".\src\main_window.ui;.\src\" --add-data ".\src\status_window.ui;.\src\"  app.py
