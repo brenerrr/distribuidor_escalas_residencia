@@ -32,7 +32,7 @@ class Manager:
         self.__start_date = f"{self.i['year']}-{MONTHS_STR2NUM[self.i['month']]}"
         self.__employees = pd.DataFrame([])
         self.__shifts_params = list()
-        self.__n_solutions = 1
+        self.__n_solutions = self.i["n_solutions"]
         self.__max_tries = 20
         self.__constraints = pd.DataFrame([])
         self.__shifts = pd.DataFrame(

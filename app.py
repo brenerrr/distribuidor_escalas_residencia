@@ -244,6 +244,7 @@ class App(QApplication):
         self.main.table_employees.doubleClicked.connect(self.create_tab_areas_employees)
 
         self.main.sb_year.valueChanged.connect(self.export_inputs)
+        self.main.sb_nSolutions.valueChanged.connect(self.export_inputs)
 
     def assign_table_signals(self, table: QTableWidget):
         table.doubleClicked.connect(self.remove_area)
@@ -425,6 +426,7 @@ class App(QApplication):
         export_dict["restrictions"] = self.get_table_data(self.main.table_restrictions)
 
         export_dict["year"] = self.main.sb_year.value()
+        export_dict["n_solutions"] = self.main.sb_nSolutions.value()
 
         path = os.path.join(folderpath, "inputs.json")
         with open(path, "w") as f:
