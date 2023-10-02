@@ -1,9 +1,14 @@
 # %%
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 import json
 from random import shuffle
 from collections import defaultdict
 from matplotlib import pyplot as plt
-from src.common_types import *
+from common_types import *
 import pandas as pd
 import numpy as np
 from random import choices, seed, shuffle
@@ -21,12 +26,14 @@ class Manager:
         self.add_employees()
         self.add_constraints()
         self.add_timeoff()
+        self.create_shifts()
 
     def initialize_variables(self):
         self.__start_date = f"{self.i['year']}-{MONTHS_STR2NUM[self.i['month']]}"
         self.__employees = pd.DataFrame([])
         self.__shifts_params = list()
         self.__n_solutions = 1
+        self.__max_tries = 20
         self.__constraints = pd.DataFrame([])
         self.__shifts = pd.DataFrame(
             [], columns=["name", "area", "date", "duration", "period"]
@@ -261,8 +268,9 @@ class Manager:
 
         return conflicts
 
-    def create_schedule(self) -> None:
-        best = self.find_solution()
+    def create_schedule(self, best: dict = None) -> None:
+        if best is None:
+            best = self.find_solution()
 
         # Assign people from solution to shifts
         solution = best["solution"][best["solution"] >= 0]
@@ -504,8 +512,6 @@ class Manager:
         self.__shifts = shifts
 
     def find_solution(self):
-        self.create_shifts()
-
         # Initialize solutions and scores
         solutions = self.create_solutions(self.__n_solutions)
         scores = self.calculate_scores(solutions)
@@ -522,83 +528,141 @@ class Manager:
         # plt.show(block=True)
         return best
 
-    def create_solutions(
-        self, n_solutions: int, guide: pd.DataFrame = None
-    ) -> pd.DataFrame:
+    def create_solution(self):
+        shifts = self.shifts.loc[::-1].reset_index()
+        solution = np.full((shifts.shape[0]), np.nan)
+        solution = pd.Series(solution)
+
+        i = 0
+        c = 0
+        while i < shifts.shape[0]:
+            shift = shifts.iloc[i]
+
+            # # Do not consider shifts without solutions
+            ii = solution.loc[: i - 1] >= 0
+            next_shifts = shifts.loc[: i - 1]
+            current_solution = solution.loc[: i - 1]
+            next_shifts = next_shifts[ii].reset_index(drop=True)
+            current_solution = current_solution[ii].reset_index(drop=True)
+
+            cost_matrix = self.calculate_costs(
+                shift,
+                current_solution,
+                next_shifts,
+            )
+
+            # If there are no eligible employees, start again
+            if (cost_matrix >= LARGE_NUMBER).all():
+                print(f"Trying generating another initial solution at step {i}")
+                print(shift["name"])
+                c += 1
+                if c > self.__max_tries:
+                    raise RuntimeError(
+                        "Could not find solution that respected all rules"
+                    )
+                i = next_shifts[next_shifts["date"].dt.day == (shift["date"].day - 7)]
+                i = 0 if i.empty else i.index[0]
+                continue
+            else:
+                # The eligible employees with the most amount of hours worked
+                # will not be considered
+                mask = cost_matrix < LARGE_NUMBER
+                if (cost_matrix[mask].min() == cost_matrix[mask]).sum() > 1:
+                    solution.loc[i] = choices(
+                        cost_matrix[cost_matrix == cost_matrix.min()].index
+                    )[0]
+                else:
+                    solution.loc[i] = np.argmin(cost_matrix)
+
+            # Find optional shifts that should not be worked
+            next_shifts_all = shifts.iloc[:i] if i > 0 else pd.DataFrame()
+            if shift["period"] == EVENING and not next_shifts_all.empty:
+                optional = next_shifts_all[
+                    (next_shifts_all["date"].dt.day == (shift["date"].day + 1))
+                    & (
+                        (next_shifts_all["period"] == AFTERNOON)
+                        | (next_shifts_all["period"] == EVENING)
+                    )
+                    & (~next_shifts_all["must_be_filled"])
+                ]
+                if not optional.empty:
+                    employee = solution.loc[i]
+                    for ii, _ in optional.iterrows():
+                        optional_employee = solution.loc[ii]
+                        if optional_employee == employee:
+                            solution.loc[ii] = -1
+
+            i += 1
+        return solution.loc[::-1].reset_index(drop=True)
+
+    def create_solutions(self, n_solutions: int) -> pd.DataFrame:
         shifts = self.shifts.loc[::-1].reset_index()
         solutions = np.full((shifts.shape[0], n_solutions), np.nan)
         solutions = pd.DataFrame(solutions)
 
-        c = 0
         for j in range(n_solutions):
-            solutions.loc[:, j] = np.nan
+            solutions.loc[:, j] = self.create_solution()
+        return solutions
 
-            # Loop through shifts
-            i = 0
-            while i < shifts.shape[0]:
-                # print(i)
-                shift = shifts.iloc[i]
+        # # Loop through shifts
+        # i = 0
+        # while i < shifts.shape[0]:
+        #     shift = shifts.iloc[i]
 
-                # next_shifts = shifts.iloc[i + 1 :]
+        #     # # Do not consider shifts without solutions
+        #     ii = solutions.loc[: i - 1, j] >= 0
+        #     next_shifts = shifts.loc[: i - 1]
+        #     solution = solutions.loc[: i - 1, j]
+        #     next_shifts = next_shifts[ii].reset_index(drop=True)
+        #     solution = solution[ii].reset_index(drop=True)
 
-                # # Do not consider shifts without solutions
-                ii = solutions.loc[: i - 1, j] >= 0
-                next_shifts = shifts.loc[: i - 1]
-                solution = solutions.loc[: i - 1, j]
-                next_shifts = next_shifts[ii].reset_index(drop=True)
-                solution = solution[ii].reset_index(drop=True)
+        #     cost_matrix = self.calculate_costs(
+        #         shift,
+        #         solution,
+        #         next_shifts,
+        #     )
 
-                # # previous_shifts = shifts.iloc[i + 1 :]
-                # next_shifts = shifts.iloc[:i] if i > 0 else pd.DataFrame()
-                # solution = solutions.loc[: i - 1, j].values
+        #     # If there are no eligible employees, start again
+        #     if (cost_matrix >= LARGE_NUMBER).all():
+        #         print(f"Trying generating another initial solution {i} {j}")
+        #         print(shift["name"])
+        #         c += 1
+        #         i = next_shifts[
+        #             next_shifts["date"].dt.day == (shift["date"].day - 7)
+        #         ]
+        #         i = 0 if i.empty else i.index[0]
+        #         continue
+        #     else:
+        #         # The eligible employees with the most amount of hours worked
+        #         # will not be considered
+        #         mask = cost_matrix < LARGE_NUMBER
+        #         if (cost_matrix[mask].min() == cost_matrix[mask]).sum() > 1:
+        #             solutions.loc[i, j] = choices(
+        #                 cost_matrix[cost_matrix == cost_matrix.min()].index
+        #             )[0]
+        #         else:
+        #             solutions.loc[i, j] = np.argmin(cost_matrix)
 
-                cost_matrix = self.calculate_costs(
-                    shift,
-                    solution,
-                    next_shifts,
-                )
+        #     # Find optional shifts that should not be worked
+        #     next_shifts_all = shifts.iloc[:i] if i > 0 else pd.DataFrame()
+        #     if shift["period"] == EVENING and not next_shifts_all.empty:
+        #         optional = next_shifts_all[
+        #             (next_shifts_all["date"].dt.day == (shift["date"].day + 1))
+        #             & (
+        #                 (next_shifts_all["period"] == AFTERNOON)
+        #                 | (next_shifts_all["period"] == EVENING)
+        #             )
+        #             & (~next_shifts_all["must_be_filled"])
+        #         ]
+        #         if not optional.empty:
+        #             employee = solutions.loc[i, j]
+        #             for ii, _ in optional.iterrows():
+        #                 optional_employee = solutions.loc[ii, j]
+        #                 if optional_employee == employee:
+        #                     solutions.loc[ii, j] = -1
 
-                # If there are no eligible employees, start again
-                if (cost_matrix >= LARGE_NUMBER).all():
-                    print(f"Trying generating another initial solution {i} {j}")
-                    print(shift["name"])
-                    c += 1
-                    i = next_shifts[
-                        next_shifts["date"].dt.day == (shift["date"].day - 7)
-                    ]
-                    i = 0 if i.empty else i.index[0]
-                    continue
-                else:
-                    # The eligible employees with the most amount of hours worked
-                    # will not be considered
-                    mask = cost_matrix < LARGE_NUMBER
-                    if (cost_matrix[mask].min() == cost_matrix[mask]).sum() > 1:
-                        solutions.loc[i, j] = choices(
-                            cost_matrix[cost_matrix == cost_matrix.min()].index
-                        )[0]
-                    else:
-                        solutions.loc[i, j] = np.argmin(cost_matrix)
-
-                # Find optional shifts that should not be worked
-                next_shifts_all = shifts.iloc[:i] if i > 0 else pd.DataFrame()
-                if shift["period"] == EVENING and not next_shifts_all.empty:
-                    optional = next_shifts_all[
-                        (next_shifts_all["date"].dt.day == (shift["date"].day + 1))
-                        & (
-                            (next_shifts_all["period"] == AFTERNOON)
-                            | (next_shifts_all["period"] == EVENING)
-                        )
-                        & (~next_shifts_all["must_be_filled"])
-                    ]
-                    if not optional.empty:
-                        employee = solutions.loc[i, j]
-                        for ii, _ in optional.iterrows():
-                            optional_employee = solutions.loc[ii, j]
-                            if optional_employee == employee:
-                                solutions.loc[ii, j] = -1
-
-                i += 1
-        return solutions.loc[::-1, :].reset_index(drop=True)
+        #     i += 1
+        # return solutions.loc[::-1, :].reset_index(drop=True)
 
     def calculate_costs(
         self,
@@ -670,7 +734,7 @@ class Manager:
             # Loop through shifts and take employees out of the pool
             for _, shift_ in same_time_previous.iterrows():
                 i = pool[pool[shift_["area"]]]
-                pool = pool.drop(index=i.index[0])
+                pool = pool.drop(index=i.index[0], errors="ignore")
 
             # Get employees from areas that are no in the pool anymore
             # and make them unselectable
