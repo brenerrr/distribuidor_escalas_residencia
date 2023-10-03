@@ -3,6 +3,8 @@ Esse software é destinado a criar e distribuir escalas para residentes médicos
 
 <img width="902" alt="gui" src="https://github.com/brenerrr/distribuidor_escalas_residencia/assets/36827826/91dc2123-2f1f-4410-8f79-d0940420192c">
 
+Versões executáveis para Windows podem ser baixadas na [seção de Releases](https://github.com/brenerrr/distribuidor_escalas_residencia/tags). 
+
 # Instalação 
 
 Instale os módulos necessários listados no arquivo _requirements.txt_ (de preferência num _virtual environment_ dedicado). **Utilize a versão de Python 3.10**. 
