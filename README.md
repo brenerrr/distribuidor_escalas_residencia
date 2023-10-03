@@ -37,5 +37,6 @@ Renomeie o arquivo _sample_inputs.json_ para _inputs.json_ e execute o programa 
 # TODOs 
 
 - Adicionar tool tips explanatórias
+- Encerrar _Worker Thread_ caso a GUI seja fechada. 
 - Corrigir bug que pode acontecer quando alguém que trabalha em turnos não obrigatórios é remanejado.
 - Adicionar testes mais detalhados para o _Manager_
