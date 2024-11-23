@@ -1,5 +1,5 @@
 # Distribuidor de Escalas para Residentes
-Esse software é destinado a criar e distribuir escalas para residentes médicos da maneira mais eficiente e balanceada possível. Atualmente utilizado ppor R1s do IMIP (Recife). 
+Esse software é destinado a criar e distribuir escalas para residentes médicos da maneira mais eficiente e balanceada possível. Originalmente desenvolvido para residentes do Instituto de Medicina Integral Professor Fernando Figueira (IMIP).
 
 <img width="902" alt="gui" src="https://github.com/brenerrr/distribuidor_escalas_residencia/assets/36827826/91dc2123-2f1f-4410-8f79-d0940420192c">
 
